@@ -2,8 +2,8 @@
 *.rsm
 *.dsk
 *.~*
-*.exe
-*.dll
+#*.exe
+#*.dll
 __recovery
 __history
 Win64
