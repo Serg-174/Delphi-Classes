@@ -66,7 +66,7 @@ constructor TDataSetEnumerator.Create(ADataSet: TDataSet);
 begin
   inherited Create;
   FDataSet := ADataSet;
-  FStarted := False; // Итерация еще не началась
+  FStarted := False;
 end;
 
 function TDataSetEnumerator.GetCurrent: TDataSet;
