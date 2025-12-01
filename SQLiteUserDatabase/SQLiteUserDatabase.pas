@@ -136,11 +136,21 @@ const
     sections_id
     );
    ''';
+
   SectionsIndex1SQL = '''
    CREATE INDEX IF NOT EXISTS sections_fk_idx ON sections (
     parent_id
     );
    ''';
+
+  SectionsIndex2SQL = '''
+   CREATE INDEX IF NOT EXISTS sections_name_idx ON sections (
+    section_name ASC
+    );
+   ''';
+
+
+
 
 implementation
 
@@ -322,6 +332,11 @@ begin
     FQuery.Close;
 
     SQL := SectionsIndex1SQL;
+    FQuery.SQL.Text := SQL;
+    FQuery.ExecSQL;
+    FQuery.Close;
+
+    SQL := SectionsIndex2SQL;
     FQuery.SQL.Text := SQL;
     FQuery.ExecSQL;
     FQuery.Close;

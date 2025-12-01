@@ -65,7 +65,7 @@ function VariantToStrEx(const Value: Variant): string;
 begin
   case VarType(Value) of
     varEmpty, varNull:
-      Result := 'null';
+      Result := '';
     varString, varUString, varOleStr:
       Result := string(Value);
     varSmallint, varInteger, varShortInt, varByte, varWord, varLongWord, varInt64:

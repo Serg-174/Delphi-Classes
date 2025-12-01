@@ -19,3 +19,4 @@ Win64
 *.o
 *.local
 *.txt
+s.sql
