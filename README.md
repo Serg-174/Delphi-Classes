@@ -1,2 +1,2 @@
 # Delphi-Classes
-Useful Delphi classes
+Useful Delphi classes and functions
