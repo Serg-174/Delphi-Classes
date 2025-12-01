@@ -78,13 +78,12 @@ function TDataSetEnumerator.MoveNext: Boolean;
 begin
   if not FStarted then
   begin
-    // Первый вызов - начинаем итерацию
     FStarted := True;
     FDataSet.First;
   end
   else
   begin
-    // Последующие вызовы - следующая запись
+
     FDataSet.Next;
   end;
 
