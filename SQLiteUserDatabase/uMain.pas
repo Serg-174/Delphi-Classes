@@ -228,7 +228,7 @@ end;
 procedure TfMain.btnWriteStringClick(Sender: TObject);
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
-  FMyOptions.WriteString(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text);
+  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text, ftString);
   lbLog.Items.Add('WriteString:');
   lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
     ledDescription.Text]));

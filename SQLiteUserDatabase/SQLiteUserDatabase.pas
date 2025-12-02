@@ -73,8 +73,7 @@ type
     {function ValueExists Indicates whether a key exists}
     function ValueExists(const KeyName: string): Boolean;
     procedure VACUUM;
-    procedure WriteString(const SectionID: Integer; const KeyName: string; Value: string; Description: string);
-    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string; Description: string; FieldType:
+    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string; Description: string; DataType:
       TFieldType);
   end;
 
@@ -471,20 +470,11 @@ begin
   FQuery.ParamByName('description').AsString := Description;
 end;
 
-procedure TmsaSQLiteUserDatabase.WriteString(const SectionID: Integer; const KeyName: string; Value: string; Description: string);
-begin
-  SetQueryCommon(SectionID, KeyName, Description);
-  FQuery.ParamByName('key_value').AsString := Value;
-  FQuery.ExecSQL;
-  FQuery.Close;
-end;
-
 procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value, Description: string;
-  FieldType: TFieldType);
+  DataType: TFieldType);
 begin
   SetQueryCommon(SectionID, KeyName, Description);
-  case FieldType of
-
+  case DataType of
     ftBoolean:
       begin
       {
@@ -496,7 +486,7 @@ begin
       end;
     ftInteger, ftSmallint, ftLargeint, ftShortint, ftLongWord, ftAutoInc:
       begin
-       FQuery.ParamByName('key_value').AsLargeInt := StrToInt64Def(Value, 0);
+        FQuery.ParamByName('key_value').AsLargeInt := StrToInt64Def(Value, 0);
       end;
     ftSingle, ftFloat, ftCurrency:
       begin
@@ -505,7 +495,7 @@ begin
 
     ftString, ftWideString, ftMemo, ftWideMemo, ftGuid:
       begin
-     //   Result := QuotedStr(AParam.AsString);
+        FQuery.ParamByName('key_value').AsString := Value;
       end;
 
     ftDate:
