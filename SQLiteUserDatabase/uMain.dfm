@@ -2,8 +2,8 @@ object fMain: TfMain
   Left = 0
   Top = 0
   Caption = 'TmsaSQLiteINI test'
-  ClientHeight = 441
-  ClientWidth = 911
+  ClientHeight = 592
+  ClientWidth = 907
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -47,22 +47,14 @@ object fMain: TfMain
     TabOrder = 3
     OnClick = btnKeysCountClick
   end
-  object cbDeleteKeysToo: TCheckBox
-    Left = 143
-    Top = 185
-    Width = 138
-    Height = 17
-    Caption = 'Delete keys too'
-    TabOrder = 4
-  end
-  object btnDeleteSections: TButton
+  object btnDeleteSection: TButton
     Left = 8
     Top = 181
     Width = 129
     Height = 25
-    Caption = 'DeleteSections'
-    TabOrder = 5
-    OnClick = btnDeleteSectionsClick
+    Caption = 'DeleteSection'
+    TabOrder = 4
+    OnClick = btnDeleteSectionClick
   end
   object ledSection: TLabeledEdit
     Left = 8
@@ -72,15 +64,15 @@ object fMain: TfMain
     EditLabel.Width = 39
     EditLabel.Height = 15
     EditLabel.Caption = 'Section'
-    TabOrder = 6
+    TabOrder = 5
     Text = 'Section Name'
   end
   object lbLog: TListBox
     Left = 327
     Top = 0
-    Width = 584
-    Height = 441
-    Align = alRight
+    Width = 582
+    Height = 592
+    Align = alCustom
     Anchors = [akLeft, akTop, akRight, akBottom]
     Font.Charset = RUSSIAN_CHARSET
     Font.Color = clWindowText
@@ -89,7 +81,9 @@ object fMain: TfMain
     Font.Style = []
     ItemHeight = 15
     ParentFont = False
-    TabOrder = 7
+    TabOrder = 6
+    ExplicitWidth = 370
+    ExplicitHeight = 441
   end
   object btnDeleteAll: TButton
     Left = 8
@@ -97,26 +91,26 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'DeleteAll'
-    TabOrder = 8
+    TabOrder = 7
     OnClick = btnDeleteAllClick
   end
-  object btnEraseSection: TButton
+  object btnEraseSectionKeys: TButton
     Left = 8
     Top = 243
     Width = 129
     Height = 25
-    Caption = 'EraseSection'
-    TabOrder = 9
-    OnClick = btnEraseSectionClick
+    Caption = 'EraseSectionKeys'
+    TabOrder = 8
+    OnClick = btnEraseSectionKeysClick
   end
-  object btnReadSection: TButton
+  object btnReadSectionKeys: TButton
     Left = 8
     Top = 274
     Width = 129
     Height = 25
-    Caption = 'ReadSection'
-    TabOrder = 10
-    OnClick = btnReadSectionClick
+    Caption = 'ReadSectionKeys'
+    TabOrder = 9
+    OnClick = btnReadSectionKeysClick
   end
   object btnReadSections: TButton
     Left = 8
@@ -124,7 +118,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'ReadSections'
-    TabOrder = 11
+    TabOrder = 10
     OnClick = btnReadSectionsClick
   end
   object btnValueExists: TButton
@@ -133,7 +127,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'ValueExists'
-    TabOrder = 12
+    TabOrder = 11
     OnClick = btnValueExistsClick
   end
   object ledKey: TLabeledEdit
@@ -144,7 +138,7 @@ object fMain: TfMain
     EditLabel.Width = 19
     EditLabel.Height = 15
     EditLabel.Caption = 'Key'
-    TabOrder = 13
+    TabOrder = 12
     Text = 'Key174'
   end
   object btnVACUUM: TButton
@@ -153,8 +147,48 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'VACUUM'
-    TabOrder = 14
+    TabOrder = 13
     OnClick = btnVACUUMClick
+  end
+  object ledKeyValue: TLabeledEdit
+    Left = 8
+    Top = 384
+    Width = 121
+    Height = 23
+    EditLabel.Width = 47
+    EditLabel.Height = 15
+    EditLabel.Caption = 'KeyValue'
+    TabOrder = 14
+    Text = ''
+  end
+  object ledDescription: TLabeledEdit
+    Left = 144
+    Top = 384
+    Width = 161
+    Height = 23
+    EditLabel.Width = 60
+    EditLabel.Height = 15
+    EditLabel.Caption = 'Description'
+    TabOrder = 15
+    Text = ''
+  end
+  object btnWriteString: TButton
+    Left = 8
+    Top = 424
+    Width = 121
+    Height = 25
+    Caption = 'WriteString'
+    TabOrder = 16
+    OnClick = btnWriteStringClick
+  end
+  object btnWriteInteger: TButton
+    Left = 8
+    Top = 455
+    Width = 121
+    Height = 25
+    Caption = 'WriteInteger'
+    TabOrder = 17
+    OnClick = btnWriteIntegerClick
   end
   object FDConnection1: TFDConnection
     Left = 520

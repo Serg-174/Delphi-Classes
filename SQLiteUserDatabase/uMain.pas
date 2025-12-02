@@ -16,28 +16,33 @@ type
     btnSectionExists: TButton;
     btnCreateSection: TButton;
     btnKeysCount: TButton;
-    cbDeleteKeysToo: TCheckBox;
     ledSection: TLabeledEdit;
     lbLog: TListBox;
     btnDeleteAll: TButton;
-    btnEraseSection: TButton;
-    btnReadSection: TButton;
+    btnEraseSectionKeys: TButton;
+    btnReadSectionKeys: TButton;
     btnReadSections: TButton;
     btnValueExists: TButton;
     ledKey: TLabeledEdit;
     btnVACUUM: TButton;
+    ledKeyValue: TLabeledEdit;
+    ledDescription: TLabeledEdit;
+    btnWriteString: TButton;
+    btnWriteInteger: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnSectionExistsClick(Sender: TObject);
     procedure btnCreateSectionClick(Sender: TObject);
     procedure btnKeysCountClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure btnDeleteSectionsClick(Sender: TObject);
+    procedure btnDeleteSectionClick(Sender: TObject);
     procedure btnDeleteAllClick(Sender: TObject);
-    procedure btnEraseSectionClick(Sender: TObject);
-    procedure btnReadSectionClick(Sender: TObject);
+    procedure btnEraseSectionKeysClick(Sender: TObject);
+    procedure btnReadSectionKeysClick(Sender: TObject);
     procedure btnReadSectionsClick(Sender: TObject);
     procedure btnValueExistsClick(Sender: TObject);
     procedure btnVACUUMClick(Sender: TObject);
+    procedure btnWriteStringClick(Sender: TObject);
+    procedure btnWriteIntegerClick(Sender: TObject);
 
   private
     { Private declarations }
@@ -142,20 +147,20 @@ begin
   lbLog.Items.Add(format('KeysCount: cnt = %d', [FMyOptions.KeysCount(Section_id)]));
 end;
 
-procedure TfMain.btnDeleteSectionsClick(Sender: TObject);
+procedure TfMain.btnDeleteSectionClick(Sender: TObject);
 var
   SectionId: integer;
 begin
   SectionId := FMyOptions.SectionId(ledSection.Text);
-  lbLog.Items.Add(format('DeleteSection: cnt = %d', [FMyOptions.DeleteSection(SectionId, cbDeleteKeysToo.Checked)]));
+  lbLog.Items.Add(format('DeleteSection: cnt = %d', [FMyOptions.DeleteSection(SectionId)]));
 end;
 
-procedure TfMain.btnEraseSectionClick(Sender: TObject);
+procedure TfMain.btnEraseSectionKeysClick(Sender: TObject);
 var
   SectionId: integer;
 begin
   SectionId := FMyOptions.SectionId(ledSection.Text);
-  lbLog.Items.Add(format('EraseSection: cnt = %d', [FMyOptions.EraseSection(SectionId)]));
+  lbLog.Items.Add(format('EraseSection: cnt = %d', [FMyOptions.EraseSectionKeys(SectionId)]));
 end;
 
 procedure TfMain.FormCreate(Sender: TObject);
@@ -170,15 +175,15 @@ begin
   FreeAndNil(FMyOptions);
 end;
 
-procedure TfMain.btnReadSectionClick(Sender: TObject);
+procedure TfMain.btnReadSectionKeysClick(Sender: TObject);
 //var
 //  F: TInifile;
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
   var KeysList: TList<TKeys> := TList<TKeys>.Create;
   try
-    FMyOptions.ReadSection(SectionId, KeysList);
-    lbLog.Items.Add('ReadSection:');
+    FMyOptions.ReadSectionKeys(SectionId, KeysList);
+    lbLog.Items.Add('ReadSectionKeys:');
     for var i := 0 to KeysList.Count - 1 do
     begin
       var Key := KeysList[i];
@@ -201,13 +206,32 @@ begin
     for var i := 0 to SectiosList.Count - 1 do
     begin
       var Section := SectiosList[i];
-      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s', [i + 1, Section.id, VariantToStrEx(Section.parent_id), Section.section_name, Section.description,
-        DateTimeToStr(Section.created_at), DateTimeToStr(Section.modif_at)]));
+      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s | %s', [i + 1, Section.id, VariantToStrEx(Section.parent_id),
+        Section.section_name, Section.description, BoolToStr(Section.hidden, True), DateTimeToStr(Section.created_at),
+        DateTimeToStr(Section.modif_at)]));
     end;
 
   finally
     SectiosList.Free;
   end;
+end;
+
+procedure TfMain.btnWriteIntegerClick(Sender: TObject);
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text, ftLargeint);
+  lbLog.Items.Add('WriteInteger:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
+    ledDescription.Text]));
+end;
+
+procedure TfMain.btnWriteStringClick(Sender: TObject);
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  FMyOptions.WriteString(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text);
+  lbLog.Items.Add('WriteString:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
+    ledDescription.Text]));
 end;
 
 initialization
