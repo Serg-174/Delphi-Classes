@@ -3,7 +3,7 @@ unit uCommon;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, Winapi.ShlObj, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls,
   Vcl.Forms, Vcl.Dialogs, System.TypInfo, System.NetEncoding, System.Zip, System.ZLib;
 
 const
@@ -71,7 +71,12 @@ procedure Base64StringToStream(Base64String: string; AStream: TStream);
 procedure SaveStreamAsZip(SourceStream: TStream; const ZipFileName: string; const InternalFileName: string = 'data.bin');
 
 function QuickCompressString(const Data: string): TBytes;
+
 procedure DecompressStream(CompressedStream, OutputStream: TStream);
+
+function VariantToStrEx(const Value: Variant): string;
+
+function GetSpecialPath(CSIDL: word): string;
 
 resourcestring
   sNotASet = 'SetToString: argument must be a set type; %s not allowed';
@@ -82,6 +87,40 @@ resourcestring
   sCharOutOfRange = 'StringToSet: Character #%0:d is out of range [#%1:d..#%2:d]';
 
 implementation
+
+function GetSpecialPath(CSIDL: word): string;
+var
+  S: string;
+begin
+  SetLength(S, MAX_PATH);
+  if not SHGetSpecialFolderPath(0, PChar(S), CSIDL, True) then
+    S := GetSpecialPath(CSIDL_APPDATA);
+  Result := PChar(S);
+end;
+
+function VariantToStrEx(const Value: Variant): string;
+begin
+  case VarType(Value) of
+    varEmpty, varNull:
+      Result := '';
+    varString, varUString, varOleStr:
+      Result := string(Value);
+    varSmallint, varInteger, varShortInt, varByte, varWord, varLongWord, varInt64:
+      Result := IntToStr(Value);
+    varSingle, varDouble, varCurrency:
+      Result := FloatToStr(Value);
+    varBoolean:
+      Result := BoolToStr(Value, True);
+    varDate:
+      Result := DateTimeToStr(Value);
+  else
+    try
+      Result := VarToStr(Value);
+    except
+      Result := '';
+    end;
+  end;
+end;
 
 procedure DecompressStream(CompressedStream, OutputStream: TStream);
 var

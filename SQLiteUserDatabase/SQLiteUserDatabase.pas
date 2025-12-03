@@ -12,7 +12,8 @@ interface
 
 uses
   System.SysUtils, System.Classes, Winapi.Windows, Winapi.ShlObj, FireDAC.Comp.Client, FireDAC.Phys.SQLite,
-  FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, Data.DB, System.Generics.Collections, DataSetEnumerator;
+  FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, Data.DB, System.Generics.Collections, DataSetEnumerator,
+  System.Variants;
 
 type
   TKeys = record
@@ -43,6 +44,8 @@ type
     FDatabaseFileName: string;
     procedure CreateMetadata;
     procedure SetQueryCommon(const SectionID: Integer; const KeyName: string; Description: string);
+    function GetSpecialPath(CSIDL: word): string;
+    function MakeDBFileName(const ADatabaseFileName: string): string;
   public
     constructor Create(const ADatabaseFileName: string);
     destructor Destroy; override;
@@ -66,15 +69,17 @@ type
     procedure DeleteAll;
     {function EraseSection erases keys entire section}
     function EraseSectionKeys(const SectionID: Integer): Integer;
-    {procedure ReadSection reads all keys from a specified section into a TList<TKeys>}
-    procedure ReadSectionKeys(const SectionID: Integer; KeysList: TList<TKeys>);
+    {procedure ReadKeys reads keys by section (if SectionID > 0) or all keys into a TList<TKeys>}
+    procedure ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);    
     {procedure ReadSections Reads all sections into a TList<TSections>}
     procedure ReadSections(SectionsList: TList<TSections>);
     {function ValueExists Indicates whether a key exists}
-    function ValueExists(const KeyName: string): Boolean;
+    function ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
     procedure VACUUM;
-    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string; Description: string; DataType:
-      TFieldType);
+    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: Variant; Description: string);
+    procedure WriteStream(const SectionID: Integer; const KeyName: string; Description: string; AStream: TStream;
+      ACompress: Boolean = False);
+
   end;
 
 const
@@ -100,20 +105,24 @@ const
    ''';
   KeysTableSQL = '''
     CREATE TABLE IF NOT EXISTS keys (
-    key_name     TEXT     PRIMARY KEY
-                         NOT NULL
-                         UNIQUE ON CONFLICT FAIL,
+    key_name    TEXT     NOT NULL,
     sections_id INTEGER  REFERENCES sections (id) ON DELETE CASCADE
-                                                  ON UPDATE NO ACTION,
-    description       TEXT,
-    key_value       ANY,
+                                                  ON UPDATE NO ACTION
+                         NOT NULL,
+    description TEXT,
+    key_value   ANY,
+    key_blob    BLOB,
     created_at  DATETIME NOT NULL
                          DEFAULT (datetime('now', 'localtime') ),
     modif_at    DATETIME NOT NULL
-                         DEFAULT (datetime('now', 'localtime') )
-                          );
-
-   ''';
+                         DEFAULT (datetime('now', 'localtime') ),
+    CONSTRAINT keys_primary_key PRIMARY KEY (
+        key_name COLLATE NOCASE,
+        sections_id
+    )
+    ON CONFLICT FAIL
+      );
+    ''';
   SectionsTriggerSQL = '''
     CREATE TRIGGER IF NOT EXISTS sections_update_modif_at
          BEFORE UPDATE OF section_name,
@@ -158,15 +167,15 @@ const
   WriteKeyValueSQL = '''
       insert into keys(key_name, sections_id, description, key_value)
       values (:key_name, :sections_id, :description, :key_value)
-      ON CONFLICT(key_name) DO UPDATE SET description = excluded.description, key_value = excluded.key_value
-      WHERE (excluded.description<>keys.description) or (excluded.key_value<>keys.key_value);
+      ON CONFLICT(key_name, sections_id) DO UPDATE SET description = excluded.description, key_value = excluded.key_value
+      WHERE ((excluded.description <> keys.description) or keys.description IS NULL) or ((excluded.key_value<>keys.key_value) or keys.key_value IS NULL);
       ''';
 
 implementation
 
   { TSettingsManager }
 
-function GetSpecialPath(CSIDL: word): string;
+function TmsaSQLiteUserDatabase.GetSpecialPath(CSIDL: word): string;
 var
   S: string;
 begin
@@ -176,7 +185,8 @@ begin
   Result := PChar(S);
 end;
 
-function MakeDBFileName(const ADatabaseFileName: string): string;
+  
+function TmsaSQLiteUserDatabase.MakeDBFileName(const ADatabaseFileName: string): string;
 var
   FileDir, FileName, LOCAL_APPDATA: string;
 begin
@@ -230,6 +240,7 @@ begin
   FConnection.Params.Values['OpenMode'] := 'CreateUTF8';
   FConnection.Params.Values['LockingMode'] := 'Normal';
   FConnection.LoginPrompt := False;
+  FConnection.FormatOptions.MaxStringSize := 1_048_576;
   try
     FConnection.Connected := True;
   except
@@ -382,23 +393,42 @@ begin
   Result := Changes();
 end;
 
-procedure TmsaSQLiteUserDatabase.ReadSectionKeys(const SectionID: Integer; KeysList: TList<TKeys>);
+procedure TmsaSQLiteUserDatabase.ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
 begin
   if KeysList = nil then
     Exit;
+  if SectionID > 0 then
+  begin
+    FQuery.SQL.Text :=
+      'SELECT key_name, sections_id, description, key_value, created_at, modif_at FROM keys WHERE sections_id = :sections_id';
+    FQuery.ParamByName('sections_id').AsInteger := SectionID;
+  end
+  else
+    FQuery.SQL.Text := 'SELECT key_name, sections_id, description, key_value, created_at, modif_at FROM keys';
 
-  FQuery.SQL.Text :=
-    'SELECT key_name, sections_id, description, key_value, created_at, modif_at FROM keys WHERE sections_id = :sections_id';
-  FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.Open;
 
   var Enumerator := FQuery.Map<TKeys>(
     function(DataSet: TDataSet): TKeys
+    var
+      Fld: TField;
+      FT: TFieldType;
+      Str: WideString;
+      
     begin
       Result.key_name := DataSet.FieldByName('key_name').AsString;
       Result.sections_id := DataSet.FieldByName('sections_id').AsInteger;
       Result.description := DataSet.FieldByName('description').AsString;
-      Result.key_value := DataSet.FieldByName('key_value').AsVariant;
+      Fld := DataSet.FieldByName('key_value');
+      FT := Fld.DataType;
+      Str := Fld.Value;
+      if Length(Str) > 100 then
+        Str := '...';
+      if FT = ftBlob then
+        Result.key_value := '<BLOB>'
+      else
+        Result.key_value := Str;
+
       Result.created_at := DataSet.FieldByName('created_at').AsDateTime;
       Result.modif_at := DataSet.FieldByName('modif_at').AsDateTime;
     end);
@@ -449,14 +479,18 @@ end;
 procedure TmsaSQLiteUserDatabase.VACUUM;
 begin
   FQuery.SQL.Text := 'VACUUM;';
-  FQuery.ExecSQL;
+  try
+    FQuery.ExecSQL;
+  except
+  end;
   FQuery.Close;
 end;
 
-function TmsaSQLiteUserDatabase.ValueExists(const KeyName: string): Boolean;
+function TmsaSQLiteUserDatabase.ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
 begin
-  FQuery.SQL.Text := 'SELECT key_name FROM keys WHERE trim(upper(key_name)) = trim(:key_name)';
+  FQuery.SQL.Text := 'SELECT key_name FROM keys WHERE (trim(upper(key_name)) = trim(:key_name)) and sections_id = :sections_id';
   FQuery.ParamByName('key_name').AsString := UpperCase(KeyName);
+  FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.Open;
   Result := FQuery.RecordCount > 0;
   FQuery.Close;
@@ -470,81 +504,23 @@ begin
   FQuery.ParamByName('description').AsString := Description;
 end;
 
-procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value, Description: string;
-  DataType: TFieldType);
+procedure TmsaSQLiteUserDatabase.WriteStream(const SectionID: Integer; const KeyName: string; Description: string;
+  AStream: TStream; ACompress: Boolean = False);
 begin
+  if SectionID < 1 then
+    Exit;
   SetQueryCommon(SectionID, KeyName, Description);
-  case DataType of
-    ftBoolean:
-      begin
-      {
-        if AParam.AsBoolean then
-          Result := '1'
-        else
-          Result := '0';
-          }
-      end;
-    ftInteger, ftSmallint, ftLargeint, ftShortint, ftLongWord, ftAutoInc:
-      begin
-        FQuery.ParamByName('key_value').AsLargeInt := StrToInt64Def(Value, 0);
-      end;
-    ftSingle, ftFloat, ftCurrency:
-      begin
-  //      Result := AParam.AsString.Replace(',', '.');
-      end;
+  FQuery.ParamByName('key_value').LoadFromStream(AStream, ftBlob);
+  FQuery.ExecSQL;
+  FQuery.Close;
+end;
 
-    ftString, ftWideString, ftMemo, ftWideMemo, ftGuid:
-      begin
-        FQuery.ParamByName('key_value').AsString := Value;
-      end;
-
-    ftDate:
-      begin
-      {
-        var TimeStamp: TSQLTimeStamp;
-        TimeStamp := AParam.AsSQLTimeStamp;
-        Result := QuotedStr(SQLTimeStampToStr('yyyymmdd', TimeStamp));
-        }
-      end;
-
-    ftTimeStamp, ftDateTime:
-      begin
-      {
-        var TimeStamp: TSQLTimeStamp;
-        TimeStamp := AParam.AsSQLTimeStamp;
-        Result := QuotedStr(SQLTimeStampToStr('yyyymmdd hh:nn:ss', TimeStamp));
-        }
-      end;
-
-    ftTime:
-      begin
-      {
-        var TimeStamp: TSQLTimeStamp;
-        TimeStamp := AParam.AsSQLTimeStamp;
-        Result := QuotedStr(SQLTimeStampToStr('hh:nn:ss', TimeStamp));
-        }
-      end;
-        {
-      .ftGraphic, .ftBlob, .ftStream:
-        begin
-          var MS := TStream.Create;
-          try
-            MS:= AParam.AsStream;
-            MS.Position := 0;
-            var SS := TStringStream.Create;
-            try
-              TNetEncoding.Base64.Encode(MS, SS);
-              Result := QuotedStr(SS.DataString);
-            finally
-              SS.Free;
-            end;
-          finally
-            MS.Free;
-          end;
-        end;
-        }
-  end;
-
+procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value: Variant; Description: string);
+begin
+  if SectionID < 1 then
+    Exit;
+  SetQueryCommon(SectionID, KeyName, Description);
+  FQuery.ParamByName('key_value').Value := Value;
   FQuery.ExecSQL;
   FQuery.Close;
 end;

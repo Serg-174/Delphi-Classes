@@ -20,15 +20,15 @@ type
     lbLog: TListBox;
     btnDeleteAll: TButton;
     btnEraseSectionKeys: TButton;
-    btnReadSectionKeys: TButton;
+    btnReadKeys: TButton;
     btnReadSections: TButton;
     btnValueExists: TButton;
     ledKey: TLabeledEdit;
     btnVACUUM: TButton;
     ledKeyValue: TLabeledEdit;
     ledDescription: TLabeledEdit;
-    btnWriteString: TButton;
-    btnWriteInteger: TButton;
+    btnWriteValue: TButton;
+    btnWriteStream: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnSectionExistsClick(Sender: TObject);
     procedure btnCreateSectionClick(Sender: TObject);
@@ -37,12 +37,12 @@ type
     procedure btnDeleteSectionClick(Sender: TObject);
     procedure btnDeleteAllClick(Sender: TObject);
     procedure btnEraseSectionKeysClick(Sender: TObject);
-    procedure btnReadSectionKeysClick(Sender: TObject);
+    procedure btnReadKeysClick(Sender: TObject);
     procedure btnReadSectionsClick(Sender: TObject);
     procedure btnValueExistsClick(Sender: TObject);
     procedure btnVACUUMClick(Sender: TObject);
-    procedure btnWriteStringClick(Sender: TObject);
-    procedure btnWriteIntegerClick(Sender: TObject);
+    procedure btnWriteValueClick(Sender: TObject);
+    procedure btnWriteStreamClick(Sender: TObject);
 
   private
     { Private declarations }
@@ -66,29 +66,8 @@ implementation
 
 {$R *.dfm}
 
-function VariantToStrEx(const Value: Variant): string;
-begin
-  case VarType(Value) of
-    varEmpty, varNull:
-      Result := '';
-    varString, varUString, varOleStr:
-      Result := string(Value);
-    varSmallint, varInteger, varShortInt, varByte, varWord, varLongWord, varInt64:
-      Result := IntToStr(Value);
-    varSingle, varDouble, varCurrency:
-      Result := FloatToStr(Value);
-    varBoolean:
-      Result := BoolToStr(Value, True);
-    varDate:
-      Result := DateTimeToStr(Value);
-  else
-    try
-      Result := VarToStr(Value);
-    except
-      Result := '';
-    end;
-  end;
-end;
+uses
+  uCommon;
 
 function ExtractSQLiteDll: Boolean;
 
@@ -125,7 +104,8 @@ end;
 
 procedure TfMain.btnValueExistsClick(Sender: TObject);
 begin
-  lbLog.Items.Add(format('ValueExists: %s', [BoolToStr(FMyOptions.ValueExists(ledKey.Text), True)]));
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  lbLog.Items.Add(format('ValueExists: %s', [BoolToStr(FMyOptions.ValueExists(SectionId, ledKey.Text), True)]));
 end;
 
 procedure TfMain.btnDeleteAllClick(Sender: TObject);
@@ -175,15 +155,15 @@ begin
   FreeAndNil(FMyOptions);
 end;
 
-procedure TfMain.btnReadSectionKeysClick(Sender: TObject);
+procedure TfMain.btnReadKeysClick(Sender: TObject);
 //var
 //  F: TInifile;
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
   var KeysList: TList<TKeys> := TList<TKeys>.Create;
   try
-    FMyOptions.ReadSectionKeys(SectionId, KeysList);
-    lbLog.Items.Add('ReadSectionKeys:');
+    FMyOptions.ReadKeys(SectionId, KeysList);
+    lbLog.Items.Add(if SectionId > 0 then format('ReadKeys (sections_id = %d):', [SectionId])else 'ReadKeys(all):');
     for var i := 0 to KeysList.Count - 1 do
     begin
       var Key := KeysList[i];
@@ -216,20 +196,38 @@ begin
   end;
 end;
 
-procedure TfMain.btnWriteIntegerClick(Sender: TObject);
+procedure TfMain.btnWriteStreamClick(Sender: TObject);
+var
+  MemStream: TMemoryStream;
+  Sz: Integer;
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
-  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text, ftLargeint);
-  lbLog.Items.Add('WriteInteger:');
-  lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
-    ledDescription.Text]));
+
+  MemStream := TMemoryStream.Create;
+  try
+    try
+      MemStream.LoadFromFile('C:\Temp\P9180009.JPG');
+      Sz := MemStream.Size;
+      FMyOptions.WriteStream(SectionId, ledKey.Text, ledDescription.Text, MemStream);
+    except
+      on E: Exception do
+      begin
+        raise;
+      end;
+    end;
+  finally
+    MemStream.Free;
+  end;
+
+  lbLog.Items.Add('WriteStream:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s | Размер: %d', [ledSection.Text, SectionId, ledKey.Text, ledDescription.Text, Sz]));
 end;
 
-procedure TfMain.btnWriteStringClick(Sender: TObject);
+procedure TfMain.btnWriteValueClick(Sender: TObject);
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
-  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text, ftString);
-  lbLog.Items.Add('WriteString:');
+  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text);
+  lbLog.Items.Add('WriteValue:');
   lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
     ledDescription.Text]));
 end;

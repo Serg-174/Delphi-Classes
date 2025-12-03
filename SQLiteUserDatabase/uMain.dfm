@@ -53,6 +53,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'DeleteSection'
+    Enabled = False
     TabOrder = 4
     OnClick = btnDeleteSectionClick
   end
@@ -82,8 +83,6 @@ object fMain: TfMain
     ItemHeight = 15
     ParentFont = False
     TabOrder = 6
-    ExplicitWidth = 370
-    ExplicitHeight = 441
   end
   object btnDeleteAll: TButton
     Left = 8
@@ -91,6 +90,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'DeleteAll'
+    Enabled = False
     TabOrder = 7
     OnClick = btnDeleteAllClick
   end
@@ -100,17 +100,18 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'EraseSectionKeys'
+    Enabled = False
     TabOrder = 8
     OnClick = btnEraseSectionKeysClick
   end
-  object btnReadSectionKeys: TButton
+  object btnReadKeys: TButton
     Left = 8
     Top = 274
     Width = 129
     Height = 25
-    Caption = 'ReadSectionKeys'
+    Caption = 'ReadKeys'
     TabOrder = 9
-    OnClick = btnReadSectionKeysClick
+    OnClick = btnReadKeysClick
   end
   object btnReadSections: TButton
     Left = 8
@@ -122,8 +123,8 @@ object fMain: TfMain
     OnClick = btnReadSectionsClick
   end
   object btnValueExists: TButton
-    Left = 8
-    Top = 336
+    Left = 167
+    Top = 168
     Width = 129
     Height = 25
     Caption = 'ValueExists'
@@ -131,8 +132,8 @@ object fMain: TfMain
     OnClick = btnValueExistsClick
   end
   object ledKey: TLabeledEdit
-    Left = 143
-    Top = 337
+    Left = 167
+    Top = 213
     Width = 121
     Height = 23
     EditLabel.Width = 19
@@ -151,8 +152,8 @@ object fMain: TfMain
     OnClick = btnVACUUMClick
   end
   object ledKeyValue: TLabeledEdit
-    Left = 8
-    Top = 384
+    Left = 167
+    Top = 259
     Width = 121
     Height = 23
     EditLabel.Width = 47
@@ -162,9 +163,9 @@ object fMain: TfMain
     Text = ''
   end
   object ledDescription: TLabeledEdit
-    Left = 144
-    Top = 384
-    Width = 161
+    Left = 167
+    Top = 306
+    Width = 138
     Height = 23
     EditLabel.Width = 60
     EditLabel.Height = 15
@@ -172,25 +173,27 @@ object fMain: TfMain
     TabOrder = 15
     Text = ''
   end
-  object btnWriteString: TButton
-    Left = 8
-    Top = 424
+  object btnWriteValue: TButton
+    Left = 176
+    Top = 344
     Width = 121
     Height = 25
-    Caption = 'WriteString'
+    Caption = 'WriteValue'
     TabOrder = 16
-    OnClick = btnWriteStringClick
+    OnClick = btnWriteValueClick
   end
-  object btnWriteInteger: TButton
-    Left = 8
-    Top = 455
+  object btnWriteStream: TButton
+    Left = 175
+    Top = 384
     Width = 121
     Height = 25
-    Caption = 'WriteInteger'
+    Caption = 'WriteStream'
     TabOrder = 17
-    OnClick = btnWriteIntegerClick
+    OnClick = btnWriteStreamClick
   end
   object FDConnection1: TFDConnection
+    FormatOptions.AssignedValues = [fvMaxStringSize]
+    FormatOptions.MaxStringSize = 10000000
     Left = 520
     Top = 16
   end
