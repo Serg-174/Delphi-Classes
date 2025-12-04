@@ -3,8 +3,8 @@ unit uCommon;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, Winapi.ShlObj, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls,
-  Vcl.Forms, Vcl.Dialogs, System.TypInfo, System.NetEncoding, System.Zip, System.ZLib;
+  Winapi.Windows, Winapi.Messages, System.SysUtils, Winapi.ShlObj, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.TypInfo, System.NetEncoding, System.Zip, System.ZLib;
 
 const
   MaxSet = 255;
@@ -70,13 +70,12 @@ procedure Base64StringToStream(Base64String: string; AStream: TStream);
 
 procedure SaveStreamAsZip(SourceStream: TStream; const ZipFileName: string; const InternalFileName: string = 'data.bin');
 
-function QuickCompressString(const Data: string): TBytes;
-
-procedure DecompressStream(CompressedStream, OutputStream: TStream);
-
 function VariantToStrEx(const Value: Variant): string;
 
 function GetSpecialPath(CSIDL: word): string;
+
+procedure CompressStream(SourceStream, CompressedStream: TStream; CompressionLevel: TZCompressionLevel = zcDefault);
+procedure DecompressStream(CompressedStream, OutputStream: TStream);
 
 resourcestring
   sNotASet = 'SetToString: argument must be a set type; %s not allowed';
@@ -87,6 +86,40 @@ resourcestring
   sCharOutOfRange = 'StringToSet: Character #%0:d is out of range [#%1:d..#%2:d]';
 
 implementation
+
+procedure DecompressStream(CompressedStream, OutputStream: TStream);
+var
+  DecompressionStream: TZDecompressionStream;
+begin
+  CompressedStream.Position := 0;
+  OutputStream.Position := 0;
+
+  DecompressionStream := TZDecompressionStream.Create(CompressedStream);
+  try
+    OutputStream.CopyFrom(DecompressionStream, 0);
+  finally
+    DecompressionStream.Free;
+  end;
+
+  OutputStream.Position := 0;
+end;
+
+procedure CompressStream(SourceStream, CompressedStream: TStream;
+  CompressionLevel: TZCompressionLevel = zcDefault);
+var
+  CompressionStream: TZCompressionStream;
+begin
+  SourceStream.Position := 0;
+  CompressedStream.Position := 0;
+  CompressedStream.Size := 0;
+  CompressionStream := TZCompressionStream.Create(CompressedStream, CompressionLevel, 15);
+  try
+    CompressionStream.CopyFrom(SourceStream);
+  finally
+    CompressionStream.Free;
+  end;
+  CompressedStream.Position := 0;
+end;
 
 function GetSpecialPath(CSIDL: word): string;
 var
@@ -122,53 +155,6 @@ begin
   end;
 end;
 
-procedure DecompressStream(CompressedStream, OutputStream: TStream);
-var
-  DecompressionStream: TZDecompressionStream;
-  Buffer: array[0..4095] of Byte;
-  BytesRead: Integer;
-begin
-  CompressedStream.Position := 0;
-  OutputStream.Position := 0;
-
-  DecompressionStream := TZDecompressionStream.Create(CompressedStream);
-  try
-    repeat
-      BytesRead := DecompressionStream.Read(Buffer, SizeOf(Buffer));
-      if BytesRead > 0 then
-        OutputStream.WriteBuffer(Buffer, BytesRead);
-    until BytesRead = 0;
-  finally
-    DecompressionStream.Free;
-  end;
-
-  OutputStream.Position := 0;
-end;
-
-function QuickCompressString(const Data: string): TBytes;
-var
-  InputStream, OutputStream: TMemoryStream;
-  CompressionStream: TZCompressionStream;
-begin
-  InputStream := TMemoryStream.Create;
-  OutputStream := TMemoryStream.Create;
-  try
-    InputStream.WriteBuffer(PChar(Data)^, Length(Data) * SizeOf(Char));
-    InputStream.Position := 0;
-    CompressionStream := TZCompressionStream.Create(clFastest, OutputStream);
-    try
-      CompressionStream.CopyFrom(InputStream, 0);
-    finally
-      CompressionStream.Free;
-    end;
-    SetLength(Result, OutputStream.Size);
-    OutputStream.Position := 0;
-    OutputStream.ReadBuffer(Result[0], OutputStream.Size);
-  finally
-    InputStream.Free;
-    OutputStream.Free;
-  end;
-end;
 
 procedure SaveStreamAsZip(SourceStream: TStream; const ZipFileName: string; const InternalFileName: string = 'data.bin');
 var

@@ -29,6 +29,10 @@ type
     ledDescription: TLabeledEdit;
     btnWriteValue: TButton;
     btnWriteStream: TButton;
+    btnReadStream: TButton;
+    btnWriteDescription: TButton;
+    cbCompress: TCheckBox;
+    Button2: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnSectionExistsClick(Sender: TObject);
     procedure btnCreateSectionClick(Sender: TObject);
@@ -43,6 +47,8 @@ type
     procedure btnVACUUMClick(Sender: TObject);
     procedure btnWriteValueClick(Sender: TObject);
     procedure btnWriteStreamClick(Sender: TObject);
+    procedure btnWriteDescriptionClick(Sender: TObject);
+    procedure btnReadStreamClick(Sender: TObject);
 
   private
     { Private declarations }
@@ -168,8 +174,9 @@ begin
     begin
       var Key := KeysList[i];
 
-      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s', [i + 1, Key.key_name, Key.sections_id, Key.description,
-        VariantToStrEx(Key.key_value), DateTimeToStr(Key.created_at), DateTimeToStr(Key.modif_at)]));
+      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s | %s | %s', [i + 1, Key.key_name, Key.sections_id, Key.description,
+        Key.key_value, Key.key_blob, BoolToStr(Key.key_blob_compressed, True), DateTimeToStr(Key.created_at),
+        DateTimeToStr(Key.modif_at)]));
     end;
 
   finally
@@ -199,16 +206,16 @@ end;
 procedure TfMain.btnWriteStreamClick(Sender: TObject);
 var
   MemStream: TMemoryStream;
-  Sz: Integer;
+  Sz, SzComp: Int64;
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
 
   MemStream := TMemoryStream.Create;
   try
     try
-      MemStream.LoadFromFile('C:\Temp\P9180009.JPG');
+      MemStream.LoadFromFile('C:\Temp\P9180009.jpg');
       Sz := MemStream.Size;
-      FMyOptions.WriteStream(SectionId, ledKey.Text, ledDescription.Text, MemStream);
+      FMyOptions.WriteStream(SectionId, ledKey.Text, MemStream, SzComp, cbCompress.Checked);
     except
       on E: Exception do
       begin
@@ -220,16 +227,48 @@ begin
   end;
 
   lbLog.Items.Add('WriteStream:');
-  lbLog.Items.Add(Format('%s(%d) | %s | %s | Размер: %d', [ledSection.Text, SectionId, ledKey.Text, ledDescription.Text, Sz]));
+  lbLog.Items.Add(Format('%s(%d) | BLOB %d / %d bytes', [ledSection.Text, SectionId, Sz, SzComp]));
 end;
 
 procedure TfMain.btnWriteValueClick(Sender: TObject);
+var
+  KeyValue: string;
 begin
   var SectionId := FMyOptions.SectionId(ledSection.Text);
-  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text, ledDescription.Text);
+  KeyValue := ledKeyValue.Text;
+  if Length(KeyValue) > 30 then
+    KeyValue := KeyValue.Substring(1, 30) + '...';
+  FMyOptions.WriteValue(SectionId, ledKey.Text, ledKeyValue.Text);
   lbLog.Items.Add('WriteValue:');
-  lbLog.Items.Add(Format('%s(%d) | %s | %s | %s', [ledSection.Text, SectionId, ledKey.Text, ledKeyValue.Text,
-    ledDescription.Text]));
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, KeyValue]));
+end;
+
+procedure TfMain.btnReadStreamClick(Sender: TObject);
+var
+  MS: TMemoryStream;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  MS := TMemoryStream.Create;
+  try
+    FMyOptions.ReadStream(SectionId, ledKey.Text, MS);
+    MS.SaveToFile('C:\Temp\saved.jpg');
+    MS.SaveToFile('C:\Temp\saved.bmp');
+  finally
+    MS.Free;
+  end;
+end;
+
+procedure TfMain.btnWriteDescriptionClick(Sender: TObject);
+var
+  Description: string;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  Description := ledDescription.Text;
+  if Length(Description) > 30 then
+    Description := Description.Substring(1, 30) + '...';
+  FMyOptions.WriteDescription(SectionId, ledKey.Text, ledDescription.Text);
+  lbLog.Items.Add('WriteDescription:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, Description]));
 end;
 
 initialization

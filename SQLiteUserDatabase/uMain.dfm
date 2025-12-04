@@ -183,13 +183,47 @@ object fMain: TfMain
     OnClick = btnWriteValueClick
   end
   object btnWriteStream: TButton
-    Left = 175
-    Top = 384
+    Left = 176
+    Top = 406
     Width = 121
     Height = 25
     Caption = 'WriteStream'
     TabOrder = 17
     OnClick = btnWriteStreamClick
+  end
+  object btnReadStream: TButton
+    Left = 17
+    Top = 464
+    Width = 120
+    Height = 25
+    Caption = 'ReadStream'
+    TabOrder = 18
+    OnClick = btnReadStreamClick
+  end
+  object btnWriteDescription: TButton
+    Left = 176
+    Top = 375
+    Width = 121
+    Height = 25
+    Caption = 'WriteDescription'
+    TabOrder = 19
+    OnClick = btnWriteDescriptionClick
+  end
+  object cbCompress: TCheckBox
+    Left = 184
+    Top = 432
+    Width = 97
+    Height = 17
+    Caption = 'Compress'
+    TabOrder = 20
+  end
+  object Button2: TButton
+    Left = 184
+    Top = 528
+    Width = 75
+    Height = 25
+    Caption = 'Button2'
+    TabOrder = 21
   end
   object FDConnection1: TFDConnection
     FormatOptions.AssignedValues = [fvMaxStringSize]

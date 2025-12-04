@@ -12,15 +12,17 @@ interface
 
 uses
   System.SysUtils, System.Classes, Winapi.Windows, Winapi.ShlObj, FireDAC.Comp.Client, FireDAC.Phys.SQLite,
-  FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, Data.DB, System.Generics.Collections, DataSetEnumerator,
-  System.Variants;
+  FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, FireDAC.Stan.Param, Data.DB, System.Generics.Collections,
+  DataSetEnumerator, System.Variants;
 
 type
   TKeys = record
     key_name: string;
     sections_id: Integer;
     description: string;
-    key_value: Variant;
+    key_value: string;
+    key_blob: string;
+    key_blob_compressed: Boolean;
     created_at: TDateTime;
     modif_at: TDateTime;
   end;
@@ -43,7 +45,7 @@ type
     FQuery: TFDQuery;
     FDatabaseFileName: string;
     procedure CreateMetadata;
-    procedure SetQueryCommon(const SectionID: Integer; const KeyName: string; Description: string);
+    procedure SetQueryCommonParams(const SectionID: Integer; const KeyName: string);
     function GetSpecialPath(CSIDL: word): string;
     function MakeDBFileName(const ADatabaseFileName: string): string;
   public
@@ -70,16 +72,17 @@ type
     {function EraseSection erases keys entire section}
     function EraseSectionKeys(const SectionID: Integer): Integer;
     {procedure ReadKeys reads keys by section (if SectionID > 0) or all keys into a TList<TKeys>}
-    procedure ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);    
+    procedure ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
     {procedure ReadSections Reads all sections into a TList<TSections>}
     procedure ReadSections(SectionsList: TList<TSections>);
     {function ValueExists Indicates whether a key exists}
     function ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
     procedure VACUUM;
-    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: Variant; Description: string);
-    procedure WriteStream(const SectionID: Integer; const KeyName: string; Description: string; AStream: TStream;
-      ACompress: Boolean = False);
-
+    procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string);
+    procedure WriteDescription(const SectionID: Integer; const KeyName: string; Description: string);
+    procedure WriteStream(const SectionID: Integer; const KeyName: string; AStream: TStream; var ASize: Int64; ACompress:
+      Boolean = False);
+    procedure ReadStream(const SectionID: Integer; const KeyName: string; AStream: TStream);
   end;
 
 const
@@ -105,23 +108,26 @@ const
    ''';
   KeysTableSQL = '''
     CREATE TABLE IF NOT EXISTS keys (
-    key_name    TEXT     NOT NULL,
-    sections_id INTEGER  REFERENCES sections (id) ON DELETE CASCADE
-                                                  ON UPDATE NO ACTION
-                         NOT NULL,
-    description TEXT,
-    key_value   ANY,
-    key_blob    BLOB,
-    created_at  DATETIME NOT NULL
-                         DEFAULT (datetime('now', 'localtime') ),
-    modif_at    DATETIME NOT NULL
-                         DEFAULT (datetime('now', 'localtime') ),
+    key_name            TEXT     NOT NULL,
+    sections_id         INTEGER  REFERENCES sections (id) ON DELETE CASCADE
+                                                          ON UPDATE NO ACTION
+                                 NOT NULL,
+    description         TEXT,
+    key_value           ANY,
+    key_blob            BLOB,
+    key_blob_compressed INTEGER  NOT NULL
+                                 DEFAULT (0)
+                                 CHECK (key_blob_compressed IN (0, 1)),
+    created_at          DATETIME NOT NULL
+                                 DEFAULT (datetime('now', 'localtime')),
+    modif_at            DATETIME NOT NULL
+                                 DEFAULT (datetime('now', 'localtime')),
     CONSTRAINT keys_primary_key PRIMARY KEY (
         key_name COLLATE NOCASE,
         sections_id
     )
     ON CONFLICT FAIL
-      );
+                                     );
     ''';
   SectionsTriggerSQL = '''
     CREATE TRIGGER IF NOT EXISTS sections_update_modif_at
@@ -165,15 +171,29 @@ const
     );
    ''';
   WriteKeyValueSQL = '''
-      insert into keys(key_name, sections_id, description, key_value)
-      values (:key_name, :sections_id, :description, :key_value)
-      ON CONFLICT(key_name, sections_id) DO UPDATE SET description = excluded.description, key_value = excluded.key_value
-      WHERE ((excluded.description <> keys.description) or keys.description IS NULL) or ((excluded.key_value<>keys.key_value) or keys.key_value IS NULL);
+      insert into keys(key_name, sections_id, key_value)
+      values (:key_name, :sections_id, :key_value)
+      ON CONFLICT(key_name, sections_id) DO UPDATE SET key_value = excluded.key_value
+      WHERE (excluded.key_value <> keys.key_value) or keys.key_value IS NULL;
+      ''';
+  WriteKeyBlobSQL = '''
+      insert into keys(key_name, sections_id, key_blob, key_blob_compressed)
+      values (:key_name, :sections_id, :key_blob, :key_blob_compressed)
+      ON CONFLICT(key_name, sections_id) DO UPDATE SET key_blob = excluded.key_blob, key_blob_compressed = excluded.key_blob_compressed
+      ''';
+  WriteKeyDescriptionSQL = '''
+      insert into keys(key_name, sections_id, description)
+      values (:key_name, :sections_id, :description)
+      ON CONFLICT(key_name, sections_id) DO UPDATE SET description = excluded.description
+      WHERE ((excluded.description <> keys.description) or keys.description IS NULL);
       ''';
 
 implementation
 
   { TSettingsManager }
+
+uses
+  uCommon;
 
 function TmsaSQLiteUserDatabase.GetSpecialPath(CSIDL: word): string;
 var
@@ -185,7 +205,6 @@ begin
   Result := PChar(S);
 end;
 
-  
 function TmsaSQLiteUserDatabase.MakeDBFileName(const ADatabaseFileName: string): string;
 var
   FileDir, FileName, LOCAL_APPDATA: string;
@@ -394,41 +413,48 @@ begin
 end;
 
 procedure TmsaSQLiteUserDatabase.ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
+var
+  SQL: string;
 begin
   if KeysList = nil then
     Exit;
+  SQL := '''
+SELECT key_name, sections_id,
+case
+ when length(ifnull(description, '')) > 30 then substr(ifnull(description, ''), 1, 30)||'...'
+ else  ifnull(description, '')
+end description,
+case
+ when length(ifnull(key_value, '')) > 30 then substr(ifnull(key_value, ''), 1, 30)||'...'
+ else  ifnull(key_value, '')
+end key_value,
+case
+ when key_blob is not null then 'BLOB ' || octet_length(key_blob) || ' bytes'
+ else 'NULL'
+end key_blob,
+key_blob_compressed,
+created_at, modif_at FROM keys
+''';
+
   if SectionID > 0 then
   begin
-    FQuery.SQL.Text :=
-      'SELECT key_name, sections_id, description, key_value, created_at, modif_at FROM keys WHERE sections_id = :sections_id';
+    FQuery.SQL.Text := SQL + ' WHERE sections_id = :sections_id';
     FQuery.ParamByName('sections_id').AsInteger := SectionID;
   end
   else
-    FQuery.SQL.Text := 'SELECT key_name, sections_id, description, key_value, created_at, modif_at FROM keys';
+    FQuery.SQL.Text := SQL;
 
   FQuery.Open;
 
   var Enumerator := FQuery.Map<TKeys>(
     function(DataSet: TDataSet): TKeys
-    var
-      Fld: TField;
-      FT: TFieldType;
-      Str: WideString;
-      
     begin
       Result.key_name := DataSet.FieldByName('key_name').AsString;
       Result.sections_id := DataSet.FieldByName('sections_id').AsInteger;
       Result.description := DataSet.FieldByName('description').AsString;
-      Fld := DataSet.FieldByName('key_value');
-      FT := Fld.DataType;
-      Str := Fld.Value;
-      if Length(Str) > 100 then
-        Str := '...';
-      if FT = ftBlob then
-        Result.key_value := '<BLOB>'
-      else
-        Result.key_value := Str;
-
+      Result.key_value := DataSet.FieldByName('key_value').AsString;
+      Result.key_blob := DataSet.FieldByName('key_blob').AsString;
+      Result.key_blob_compressed := DataSet.FieldByName('key_blob_compressed').AsInteger = 1;
       Result.created_at := DataSet.FieldByName('created_at').AsDateTime;
       Result.modif_at := DataSet.FieldByName('modif_at').AsDateTime;
     end);
@@ -444,8 +470,6 @@ begin
 end;
 
 procedure TmsaSQLiteUserDatabase.ReadSections(SectionsList: TList<TSections>);
-var
-  FldHidden: Integer;
 begin
   if SectionsList = nil then
     Exit;
@@ -460,8 +484,7 @@ begin
       Result.parent_id := DataSet.FieldByName('parent_id').Value;
       Result.section_name := DataSet.FieldByName('section_name').AsString;
       Result.description := DataSet.FieldByName('description').AsString;
-      FldHidden := DataSet.FieldByName('hidden').AsInteger;
-      Result.hidden := (FldHidden = 1);
+      Result.hidden := (DataSet.FieldByName('hidden').AsInteger = 1);
       Result.created_at := DataSet.FieldByName('created_at').AsDateTime;
       Result.modif_at := DataSet.FieldByName('modif_at').AsDateTime;
     end);
@@ -488,40 +511,107 @@ end;
 
 function TmsaSQLiteUserDatabase.ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
 begin
-  FQuery.SQL.Text := 'SELECT key_name FROM keys WHERE (trim(upper(key_name)) = trim(:key_name)) and sections_id = :sections_id';
-  FQuery.ParamByName('key_name').AsString := UpperCase(KeyName);
-  FQuery.ParamByName('sections_id').AsInteger := SectionID;
+  FQuery.SQL.Text :=
+    'SELECT key_name FROM keys WHERE trim(upper(key_name)) = trim(upper(:key_name)) and sections_id = :sections_id';
+  SetQueryCommonParams(SectionID, KeyName);
   FQuery.Open;
   Result := FQuery.RecordCount > 0;
   FQuery.Close;
 end;
 
-procedure TmsaSQLiteUserDatabase.SetQueryCommon(const SectionID: Integer; const KeyName: string; Description: string);
+procedure TmsaSQLiteUserDatabase.SetQueryCommonParams(const SectionID: Integer; const KeyName: string);
 begin
-  FQuery.SQL.Text := WriteKeyValueSQL;
   FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.ParamByName('key_name').AsString := KeyName;
-  FQuery.ParamByName('description').AsString := Description;
 end;
 
-procedure TmsaSQLiteUserDatabase.WriteStream(const SectionID: Integer; const KeyName: string; Description: string;
-  AStream: TStream; ACompress: Boolean = False);
+procedure TmsaSQLiteUserDatabase.WriteStream(const SectionID: Integer; const KeyName: string; AStream: TStream; var
+  ASize: Int64; ACompress: Boolean = False);
+var
+  CompressedStream: TMemoryStream;
 begin
   if SectionID < 1 then
     Exit;
-  SetQueryCommon(SectionID, KeyName, Description);
-  FQuery.ParamByName('key_value').LoadFromStream(AStream, ftBlob);
+  ASize := AStream.Size;
+  FQuery.SQL.Text := WriteKeyBlobSQL;
+  SetQueryCommonParams(SectionID, KeyName);
+
+  if ACompress then
+  begin
+    CompressedStream := TMemoryStream.Create;
+    try
+      CompressStream(AStream, CompressedStream);
+      FQuery.ParamByName('key_blob').LoadFromStream(CompressedStream, ftBlob);
+      FQuery.ParamByName('key_blob_compressed').AsInteger := 1;
+      ASize := CompressedStream.Size;
+    finally
+      CompressedStream.Free;
+    end;
+  end
+  else
+  begin
+    FQuery.ParamByName('key_blob').LoadFromStream(AStream, ftBlob);
+    FQuery.ParamByName('key_blob_compressed').AsInteger := 0;
+  end;
   FQuery.ExecSQL;
   FQuery.Close;
 end;
 
-procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value: Variant; Description: string);
+procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value: string);
 begin
   if SectionID < 1 then
     Exit;
-  SetQueryCommon(SectionID, KeyName, Description);
-  FQuery.ParamByName('key_value').Value := Value;
+  FQuery.SQL.Text := WriteKeyValueSQL;
+  SetQueryCommonParams(SectionID, KeyName);
+  FQuery.ParamByName('key_value').AsString := Value;
   FQuery.ExecSQL;
+  FQuery.Close;
+end;
+
+procedure TmsaSQLiteUserDatabase.WriteDescription(const SectionID: Integer; const KeyName: string; Description: string);
+begin
+  if SectionID < 1 then
+    Exit;
+  FQuery.SQL.Text := WriteKeyDescriptionSQL;
+  SetQueryCommonParams(SectionID, KeyName);
+  FQuery.ParamByName('description').AsString := Description;
+  FQuery.ExecSQL;
+  FQuery.Close;
+end;
+
+procedure TmsaSQLiteUserDatabase.ReadStream(const SectionID: Integer; const KeyName: string; AStream: TStream);
+var
+  IsCompressed: Boolean;
+  BS: TStream;
+  BlobFld: TField;
+begin
+  if SectionID < 1 then
+    Exit;
+  if AStream = nil then
+    Exit;
+
+  FQuery.SQL.Text :=
+    'SELECT key_blob, key_blob_compressed FROM keys WHERE (trim(upper(key_name)) = trim(upper(:key_name))) and sections_id = :sections_id';
+  FQuery.ParamByName('key_name').AsString := KeyName;
+  FQuery.ParamByName('sections_id').AsInteger := SectionID;
+  FQuery.Open;
+  IsCompressed := FQuery.FieldByName('key_blob_compressed').AsInteger = 1;
+  BlobFld := FQuery.FieldByName('key_blob');
+  if FQuery.RecordCount = 0 then
+    Exit;
+  if BlobFld.IsNull then
+    Exit;
+  BS := FQuery.CreateBlobStream(BlobFld, Tblobstreammode.bmRead);
+  try
+    if IsCompressed then
+      DecompressStream(BS, AStream)
+    else
+      AStream.CopyFrom(BS);
+
+    AStream.Position := 0;
+  finally
+    BS.Free;
+  end;
   FQuery.Close;
 end;
 
