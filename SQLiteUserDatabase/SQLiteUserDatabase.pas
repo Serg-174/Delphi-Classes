@@ -13,7 +13,7 @@ interface
 uses
   System.SysUtils, System.Classes, Winapi.Windows, Winapi.ShlObj, FireDAC.Comp.Client, FireDAC.Phys.SQLite,
   FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, FireDAC.Stan.Param, Data.DB, System.Generics.Collections,
-  DataSetEnumerator, System.Variants;
+  DataSetEnumerator, System.Variants, System.DateUtils;
 
 type
   TKeys = record
@@ -54,35 +54,30 @@ type
     property DatabaseFileName: string read FDatabaseFileName;
     function SectionExists(const SectionName: string): Integer;
     function CreateSection(const SectionName, Description: string): Integer;
-    {The last_insert_rowid() function returns the ROWID of the last row insert from the database
-     connection which invoked the function. The last_insert_rowid() SQL function is a wrapper
-     around the sqlite3_last_insert_rowid() C/C++ interface function.}
     function Last_Insert_Rowid(): Integer;
     function SectionId(const SectionName: string): Integer;
     function KeysCount(const SectionID: Integer): Integer;
-   {function DeleteSection deletes section and all subsections and keys}
     function DeleteSection(const SectionID: Integer): Integer;
-    {The changes() function returns the number of database rows that were changed or inserted or deleted
-     by the most recently completed INSERT, DELETE, or UPDATE statement,
-     exclusive of statements in lower-level triggers. The changes() SQL function is a wrapper
-     around the sqlite3_changes64() C/C++ function and hence follows
-     the same rules for counting changes.}
     function Changes(): Integer;
-    procedure DeleteAll;
-    {function EraseSection erases keys entire section}
+    function DeleteAll: Integer;
+    function DeleteKey(const SectionID: Integer; const KeyName: string): Integer;
     function EraseSectionKeys(const SectionID: Integer): Integer;
-    {procedure ReadKeys reads keys by section (if SectionID > 0) or all keys into a TList<TKeys>}
     procedure ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
-    {procedure ReadSections Reads all sections into a TList<TSections>}
     procedure ReadSections(SectionsList: TList<TSections>);
-    {function ValueExists Indicates whether a key exists}
     function ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
-    procedure VACUUM;
+    procedure Vacuum;
     procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string);
     procedure WriteDescription(const SectionID: Integer; const KeyName: string; Description: string);
     procedure WriteStream(const SectionID: Integer; const KeyName: string; AStream: TStream; var ASize: Int64; ACompress:
       Boolean = False);
     procedure ReadStream(const SectionID: Integer; const KeyName: string; AStream: TStream);
+    function ReadValue(const SectionID: Integer; const KeyName: string): string;
+    function ReadInteger(const SectionID: Integer; const KeyName: string): Int64;
+    function ReadFloat(const SectionID: Integer; const KeyName: string): Extended;
+    function ReadDateTime(const SectionID: Integer; const KeyName: string): TDateTime;
+    function ReadDate(const SectionID: Integer; const KeyName: string): TDate;
+    function ReadTime(const SectionID: Integer; const KeyName: string): TTime;
+    function ReadBool(const SectionID: Integer; const KeyName: string): Boolean;
   end;
 
 const
@@ -253,13 +248,14 @@ begin
 
   FConnection := TFDConnection.Create(nil);
   FQuery := TFDQuery.Create(nil);
-  FQuery.Connection := FConnection;
   FConnection.DriverName := 'SQLite';
   FConnection.Params.Values['Database'] := FDatabaseFileName;
   FConnection.Params.Values['OpenMode'] := 'CreateUTF8';
   FConnection.Params.Values['LockingMode'] := 'Normal';
   FConnection.LoginPrompt := False;
   FConnection.FormatOptions.MaxStringSize := 1_048_576;
+  FQuery.Connection := FConnection;
+
   try
     FConnection.Connected := True;
   except
@@ -291,25 +287,16 @@ end;
 
 function TmsaSQLiteUserDatabase.DeleteSection(const SectionID: Integer): Integer;
 begin
-  Result := 0;
-//  if DeleteKeysToo then
-//    FQuery.SQL.Text := 'DELETE FROM keys WHERE sections_id = :sections_id'
- // else
-//    FQuery.SQL.Text := 'UPDATE keys SET sections_id = NULL WHERE sections_id = :sections_id';
- // FQuery.ParamByName('sections_id').AsInteger := SectionID;
- // FQuery.ExecSQL;
- // FQuery.Close;
   FQuery.SQL.Text := 'DELETE FROM sections WHERE id = :sections_id';
   FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.ExecSQL;
   FQuery.Close;
-
   Result := Changes();
 end;
 
 destructor TmsaSQLiteUserDatabase.Destroy;
 begin
-  VACUUM;
+//  Vacuum;
   if Assigned(FQuery) then
     FQuery.Free;
   if Assigned(FConnection) then
@@ -393,18 +380,27 @@ begin
   end;
 end;
 
-procedure TmsaSQLiteUserDatabase.DeleteAll;
+function TmsaSQLiteUserDatabase.DeleteAll;
 begin
   FQuery.SQL.Text := 'DELETE FROM keys;';
   FQuery.ExecSQL;
   FQuery.SQL.Text := 'DELETE FROM sections;';
   FQuery.ExecSQL;
   FQuery.Close;
+  Result := Changes();
+end;
+
+function TmsaSQLiteUserDatabase.DeleteKey(const SectionID: Integer; const KeyName: string): Integer;
+begin
+  FQuery.SQL.Text := 'DELETE FROM keys WHERE trim(upper(key_name)) = trim(upper(:key_name)) and sections_id = :sections_id';
+  SetQueryCommonParams(SectionID, KeyName);
+  FQuery.ExecSQL;
+  FQuery.Close;
+  Result := Changes();
 end;
 
 function TmsaSQLiteUserDatabase.EraseSectionKeys(const SectionID: Integer): Integer;
 begin
-  Result := 0;
   FQuery.SQL.Text := 'DELETE FROM keys WHERE sections_id = :sections_id';
   FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.ExecSQL;
@@ -564,7 +560,9 @@ begin
   FQuery.SQL.Text := WriteKeyValueSQL;
   SetQueryCommonParams(SectionID, KeyName);
   FQuery.ParamByName('key_value').AsString := Value;
+
   FQuery.ExecSQL;
+
   FQuery.Close;
 end;
 
@@ -613,6 +611,76 @@ begin
     BS.Free;
   end;
   FQuery.Close;
+end;
+
+function TmsaSQLiteUserDatabase.ReadValue(const SectionID: Integer; const KeyName: string): string;
+begin
+  Result := '';
+  if SectionID < 1 then
+    Exit;
+  FQuery.SQL.Text :=
+    'SELECT key_value FROM keys WHERE (trim(upper(key_name)) = trim(upper(:key_name))) and sections_id = :sections_id';
+  SetQueryCommonParams(SectionID, KeyName);
+  FQuery.Open;
+  Result := FQuery.FieldByName('key_value').AsString;
+end;
+
+function TmsaSQLiteUserDatabase.ReadFloat(const SectionID: Integer; const KeyName: string): Extended;
+var
+  S: string;
+  DS: Char;
+begin
+  S := trim(ReadValue(SectionID, KeyName));
+  S := S.Replace(',', '.');
+  DS := FormatSettings.DecimalSeparator;
+  FormatSettings.DecimalSeparator := '.';
+  Result := StrToFloatDef(S, 0.0);
+  FormatSettings.DecimalSeparator := DS;
+end;
+
+function TmsaSQLiteUserDatabase.ReadInteger(const SectionID: Integer; const KeyName: string): Int64;
+var
+  S: string;
+  P: Integer;
+begin
+  S := trim(ReadValue(SectionID, KeyName));
+  S := S.Replace(',', '.');
+  P := Pos('.', S);
+  if P > 0 then
+    S := S.Substring(0, P - 1);
+  Result := StrToInt64Def(S, 0);
+end;
+
+function TmsaSQLiteUserDatabase.ReadDateTime(const SectionID: Integer; const KeyName: string): TDateTime;
+var
+  S: string;
+begin
+  S := trim(ReadValue(SectionID, KeyName));
+  Result := StrToDateTimeDef(S, 0);
+end;
+
+function TmsaSQLiteUserDatabase.ReadDate(const SectionID: Integer; const KeyName: string): TDate;
+var
+  S: string;
+begin
+  S := Trim(ReadValue(SectionID, KeyName));
+  Result := DateOf(StrToDateTimeDef(S, 0));
+end;
+
+function TmsaSQLiteUserDatabase.ReadTime(const SectionID: Integer; const KeyName: string): TTime;
+var
+  S: string;
+begin
+  S := Trim(ReadValue(SectionID, KeyName));
+  Result := TimeOf(StrToDateTimeDef(S, 0));
+end;
+
+function TmsaSQLiteUserDatabase.ReadBool(const SectionID: Integer; const KeyName: string): Boolean;
+var
+  S: string;
+begin
+  S := AnsiUpperCase(Trim((ReadValue(SectionID, KeyName))));
+  Result := (S = 'TRUE') or (S = '1') or (S = 'YES') or (S = 'ÄÀ');
 end;
 
 end.

@@ -7,12 +7,12 @@ uses
   Vcl.Forms, Vcl.Dialogs, Winapi.ShlObj, Vcl.StdCtrls, FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Error,
   FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys,
   FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client, System.IOUtils, Vcl.Mask, Vcl.ExtCtrls, System.IniFiles,
-  System.Generics.Collections, SQLiteUserDatabase;
+  System.Generics.Collections, SQLiteUserDatabase, System.StrUtils, FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf,
+  FireDAC.DApt, FireDAC.Comp.DataSet;
 
 type
   TfMain = class(TForm)
     edDBName: TEdit;
-    FDConnection1: TFDConnection;
     btnSectionExists: TButton;
     btnCreateSection: TButton;
     btnKeysCount: TButton;
@@ -33,6 +33,18 @@ type
     btnWriteDescription: TButton;
     cbCompress: TCheckBox;
     Button2: TButton;
+    btnReadValue: TButton;
+    ReadInteger: TButton;
+    btnReadFloat: TButton;
+    btnReadDateTime: TButton;
+    Button1: TButton;
+    btnReadDate: TButton;
+    btnReadTime: TButton;
+    btnReadBool: TButton;
+    btnDeleteKey: TButton;
+    btnCommit: TButton;
+    btnRollback: TButton;
+    FDQuery1: TFDQuery;
     procedure FormCreate(Sender: TObject);
     procedure btnSectionExistsClick(Sender: TObject);
     procedure btnCreateSectionClick(Sender: TObject);
@@ -49,6 +61,16 @@ type
     procedure btnWriteStreamClick(Sender: TObject);
     procedure btnWriteDescriptionClick(Sender: TObject);
     procedure btnReadStreamClick(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure btnReadValueClick(Sender: TObject);
+    procedure ReadIntegerClick(Sender: TObject);
+    procedure btnReadFloatClick(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure btnReadDateTimeClick(Sender: TObject);
+    procedure btnReadDateClick(Sender: TObject);
+    procedure btnReadTimeClick(Sender: TObject);
+    procedure btnReadBoolClick(Sender: TObject);
+    procedure btnDeleteKeyClick(Sender: TObject);
 
   private
     { Private declarations }
@@ -81,7 +103,6 @@ function ExtractSQLiteDll: Boolean;
   var
     Res: TResourceStream;
   begin
-    Result := False;
     Res := TResourceStream.Create(hInstance, UpperCase(AResName), Pchar(UpperCase(AResType)));
     try
       Res.SavetoFile(AFileName);
@@ -92,7 +113,6 @@ function ExtractSQLiteDll: Boolean;
   end;
 
 begin
-  Result := False;
   if not FileExists(SQLiteDll) then
     ExtractRes('SQLiteDLL', 'DLL', SQLiteDll);
   Result := True;
@@ -105,7 +125,7 @@ end;
 
 procedure TfMain.btnVACUUMClick(Sender: TObject);
 begin
-  FMyOptions.VACUUM;
+  FMyOptions.Vacuum;
 end;
 
 procedure TfMain.btnValueExistsClick(Sender: TObject);
@@ -269,6 +289,125 @@ begin
   FMyOptions.WriteDescription(SectionId, ledKey.Text, ledDescription.Text);
   lbLog.Items.Add('WriteDescription:');
   lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, Description]));
+end;
+
+procedure TfMain.Button1Click(Sender: TObject);
+begin
+  ledKeyValue.Text := DateTimeToStr(Now);
+end;
+
+procedure TfMain.Button2Click(Sender: TObject);
+var
+  TestString, OutStr: string;
+  StrStream: TStringStream;
+  Sz, SzComp: Int64;
+begin
+  TestString := 'Hello World! Это тестовая строка для проверки сжатия. ' + StringOfChar('ё', 1000);
+  TestString := DupeString(TestString, 100);
+
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  StrStream := TStringStream(StrToStream(TestString));
+  try
+    try
+      Sz := StrStream.Size;
+      StrStream.SaveToFile('C:\Temp\StrStream.dat');
+      FMyOptions.WriteStream(SectionId, ledKey.Text, StrStream, SzComp, cbCompress.Checked);
+      StrStream.Position := 0;
+      StrStream.Clear;
+      FMyOptions.ReadStream(SectionId, ledKey.Text, StrStream);
+      OutStr := StreamToStr(StrStream);
+      if CompareStr(OutStr, TestString) = 0 then
+        ShowMessage('Строки одинаковы!');
+    except
+      on E: Exception do
+      begin
+        raise;
+      end;
+    end;
+  finally
+    StrStream.Free;
+  end;
+
+  lbLog.Items.Add('WriteStream:');
+  lbLog.Items.Add(Format('%s(%d) | BLOB %d / %d bytes', [ledSection.Text, SectionId, Sz, SzComp]));
+end;
+
+procedure TfMain.btnReadValueClick(Sender: TObject);
+var
+  V: string;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadValue(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadValue:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, V]));
+end;
+
+
+
+procedure TfMain.ReadIntegerClick(Sender: TObject);
+var
+  V: Int64;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadInteger(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadInteger:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %d', [ledSection.Text, SectionId, ledKey.Text, V]));
+end;
+
+procedure TfMain.btnReadFloatClick(Sender: TObject);
+var
+  V: Extended;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadFloat(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadFloat:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, FloatToStr(V)]));
+end;
+
+procedure TfMain.btnReadDateTimeClick(Sender: TObject);
+var
+  V: TDateTime;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadDateTime(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadDateTime:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, DateTimeToStr(V)]));
+end;
+
+procedure TfMain.btnReadDateClick(Sender: TObject);
+var
+  V: TDate;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadDate(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadDate:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, DateToStr(V)]));
+end;
+
+procedure TfMain.btnReadTimeClick(Sender: TObject);
+var
+  V: TTime;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadTime(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadTime:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, TimeToStr(V)]));
+end;
+
+procedure TfMain.btnReadBoolClick(Sender: TObject);
+var
+  V: Boolean;
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  V := FMyOptions.ReadBool(SectionId, ledKey.Text);
+  lbLog.Items.Add('ReadBool:');
+  lbLog.Items.Add(Format('%s(%d) | %s | %s', [ledSection.Text, SectionId, ledKey.Text, BoolToStr(V, True)]));
+end;
+
+procedure TfMain.btnDeleteKeyClick(Sender: TObject);
+begin
+  var SectionId := FMyOptions.SectionId(ledSection.Text);
+  lbLog.Items.Add(format('DeleteKey: cnt = %d', [FMyOptions.DeleteKey(SectionId, ledKey.Text)]));
 end;
 
 initialization

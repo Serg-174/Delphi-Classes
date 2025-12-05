@@ -61,8 +61,10 @@ procedure StringToEnumSet(const Str: string; CompInfo: PTypeInfo; CompData: PTyp
 procedure SkipWhiteSpace(const Str: string; var I: Integer);
 
 procedure StringToStream(const AString: string; AStream: TStream);
-
 function StringFromStream(AStream: TStream): string;
+
+function StrToStream(const S: string; Encoding: TEncoding = nil): TStream;
+function StreamToStr(Stream: TStream; Encoding: TEncoding = nil): string;
 
 function StreamToBase64String(AStream: TStream): string;
 
@@ -76,6 +78,7 @@ function GetSpecialPath(CSIDL: word): string;
 
 procedure CompressStream(SourceStream, CompressedStream: TStream; CompressionLevel: TZCompressionLevel = zcDefault);
 procedure DecompressStream(CompressedStream, OutputStream: TStream);
+
 
 resourcestring
   sNotASet = 'SetToString: argument must be a set type; %s not allowed';
@@ -197,6 +200,31 @@ begin
     Result := Reader.ReadToEnd;
   finally
     Reader.Free;
+  end;
+end;
+
+function StrToStream(const S: string; Encoding: TEncoding = nil): TStream;
+begin
+  if Encoding = nil then
+    Encoding := TEncoding.UTF8;
+
+  Result := TStringStream.Create(S, Encoding);
+end;
+
+function StreamToStr(Stream: TStream; Encoding: TEncoding = nil): string;
+var
+  StringStream: TStringStream;
+begin
+  if Encoding = nil then
+    Encoding := TEncoding.UTF8;
+
+  Stream.Position := 0;
+  StringStream := TStringStream.Create('', Encoding);
+  try
+    StringStream.CopyFrom(Stream, Stream.Size);
+    Result := StringStream.DataString;
+  finally
+    StringStream.Free;
   end;
 end;
 

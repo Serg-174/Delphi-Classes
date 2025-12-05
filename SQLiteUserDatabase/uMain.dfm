@@ -2,7 +2,7 @@ object fMain: TfMain
   Left = 0
   Top = 0
   Caption = 'TmsaSQLiteINI test'
-  ClientHeight = 592
+  ClientHeight = 618
   ClientWidth = 907
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -69,10 +69,10 @@ object fMain: TfMain
     Text = 'Section Name'
   end
   object lbLog: TListBox
-    Left = 327
+    Left = 440
     Top = 0
-    Width = 582
-    Height = 592
+    Width = 469
+    Height = 618
     Align = alCustom
     Anchors = [akLeft, akTop, akRight, akBottom]
     Font.Charset = RUSSIAN_CHARSET
@@ -218,17 +218,113 @@ object fMain: TfMain
     TabOrder = 20
   end
   object Button2: TButton
-    Left = 184
-    Top = 528
+    Left = 176
+    Top = 455
     Width = 75
     Height = 25
     Caption = 'Button2'
     TabOrder = 21
+    OnClick = Button2Click
   end
-  object FDConnection1: TFDConnection
-    FormatOptions.AssignedValues = [fvMaxStringSize]
-    FormatOptions.MaxStringSize = 10000000
-    Left = 520
-    Top = 16
+  object btnReadValue: TButton
+    Left = 17
+    Top = 495
+    Width = 75
+    Height = 25
+    Caption = 'ReadValue'
+    TabOrder = 22
+    OnClick = btnReadValueClick
+  end
+  object ReadInteger: TButton
+    Left = 17
+    Top = 526
+    Width = 75
+    Height = 25
+    Caption = 'ReadInteger'
+    TabOrder = 23
+    OnClick = ReadIntegerClick
+  end
+  object btnReadFloat: TButton
+    Left = 98
+    Top = 495
+    Width = 75
+    Height = 25
+    Caption = 'ReadFloat'
+    TabOrder = 24
+    OnClick = btnReadFloatClick
+  end
+  object btnReadDateTime: TButton
+    Left = 98
+    Top = 526
+    Width = 87
+    Height = 25
+    Caption = 'ReadDateTime'
+    TabOrder = 25
+    OnClick = btnReadDateTimeClick
+  end
+  object Button1: TButton
+    Left = 16
+    Top = 360
+    Width = 75
+    Height = 25
+    Caption = 'Set now'
+    TabOrder = 26
+    OnClick = Button1Click
+  end
+  object btnReadDate: TButton
+    Left = 191
+    Top = 526
+    Width = 97
+    Height = 25
+    Caption = 'ReadDate'
+    TabOrder = 27
+    OnClick = btnReadDateClick
+  end
+  object btnReadTime: TButton
+    Left = 191
+    Top = 557
+    Width = 97
+    Height = 25
+    Caption = 'ReadTime'
+    TabOrder = 28
+    OnClick = btnReadTimeClick
+  end
+  object btnReadBool: TButton
+    Left = 40
+    Top = 576
+    Width = 75
+    Height = 25
+    Caption = 'ReadBool'
+    TabOrder = 29
+    OnClick = btnReadBoolClick
+  end
+  object btnDeleteKey: TButton
+    Left = 304
+    Top = 212
+    Width = 75
+    Height = 25
+    Caption = 'DeleteKey'
+    TabOrder = 30
+    OnClick = btnDeleteKeyClick
+  end
+  object btnCommit: TButton
+    Left = 328
+    Top = 520
+    Width = 75
+    Height = 25
+    Caption = 'Commit'
+    TabOrder = 31
+  end
+  object btnRollback: TButton
+    Left = 328
+    Top = 551
+    Width = 75
+    Height = 25
+    Caption = 'Rollback'
+    TabOrder = 32
+  end
+  object FDQuery1: TFDQuery
+    Left = 344
+    Top = 88
   end
 end
