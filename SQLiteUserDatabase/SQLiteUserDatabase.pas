@@ -13,7 +13,8 @@ interface
 uses
   System.SysUtils, System.Classes, Winapi.Windows, Winapi.ShlObj, FireDAC.Comp.Client, FireDAC.Phys.SQLite,
   FireDAC.Stan.Def, FireDAC.DApt, System.IOUtils, FireDAC.Stan.Param, Data.DB, System.Generics.Collections,
-  DataSetEnumerator, System.Variants, System.DateUtils;
+  DataSetEnumerator, System.Variants, System.DateUtils, FireDAC.UI.Intf, FireDAC.VCLUI.Wait, FireDAC.Stan.Intf,
+  FireDAC.Comp.UI, FireDAC.Stan.Async;
 
 type
   TKeys = record
@@ -52,10 +53,9 @@ type
     constructor Create(const ADatabaseFileName: string);
     destructor Destroy; override;
     property DatabaseFileName: string read FDatabaseFileName;
-    function SectionExists(const SectionName: string): Integer;
-    function CreateSection(const SectionName, Description: string): Integer;
+    function SectionExists(const ParentID: Integer; const SectionName: string): Integer;
+    function CreateSection(const ParentID: Integer; const SectionName, Description: string): Integer;
     function Last_Insert_Rowid(): Integer;
-    function SectionId(const SectionName: string): Integer;
     function KeysCount(const SectionID: Integer): Integer;
     function DeleteSection(const SectionID: Integer): Integer;
     function Changes(): Integer;
@@ -63,7 +63,7 @@ type
     function DeleteKey(const SectionID: Integer; const KeyName: string): Integer;
     function EraseSectionKeys(const SectionID: Integer): Integer;
     procedure ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
-    procedure ReadSections(SectionsList: TList<TSections>);
+    procedure ReadSections(const SectionID: Integer; SectionsList: TList<TSections>);
     function ValueExists(const SectionID: Integer; const KeyName: string): Boolean;
     procedure Vacuum;
     procedure WriteValue(const SectionID: Integer; const KeyName: string; Value: string);
@@ -88,8 +88,7 @@ const
                           NOT NULL,
     parent_id    INTEGER  REFERENCES sections (id) ON DELETE CASCADE
                                                    ON UPDATE NO ACTION,
-    section_name TEXT     NOT NULL
-                          UNIQUE ON CONFLICT FAIL,
+    section_name TEXT     NOT NULL,
     description  TEXT,
     hidden       INTEGER  NOT NULL
                           DEFAULT (0)
@@ -97,9 +96,7 @@ const
     created_at   DATETIME NOT NULL
                           DEFAULT (datetime('now', 'localtime') ),
     modif_at     DATETIME NOT NULL
-                          DEFAULT (datetime('now', 'localtime') )
-   );
-
+                          DEFAULT (datetime('now', 'localtime') ));
    ''';
   KeysTableSQL = '''
     CREATE TABLE IF NOT EXISTS keys (
@@ -121,8 +118,7 @@ const
         key_name COLLATE NOCASE,
         sections_id
     )
-    ON CONFLICT FAIL
-                                     );
+    ON CONFLICT FAIL);
     ''';
   SectionsTriggerSQL = '''
     CREATE TRIGGER IF NOT EXISTS sections_update_modif_at
@@ -150,20 +146,37 @@ const
       WHERE key_name = NEW.key_name;
     END;
    ''';
+  ViewSectionsTreeSQL = '''
+    CREATE VIEW IF NOT EXISTS v_sections_tree AS
+    WITH RECURSIVE subtree AS (
+       SELECT s.id,
+               s.parent_id,
+               0 AS lvl,
+               CAST (s.section_name AS TEXT) AS path
+          FROM sections s
+         WHERE s.parent_id IS NULL
+        UNION ALL
+        SELECT s.id,
+               s.parent_id,
+               st.lvl + 1,
+               st.path || '\' || s.section_name
+          FROM sections s
+               JOIN
+               subtree st ON s.parent_id = st.id
+                )
+    SELECT st.id, st.parent_id, st.lvl, st.path FROM subtree st
+    INNER JOIN sections s ON s.id = st.id;
+    ''';
   KeysIndex1SQL = '''
-   CREATE INDEX IF NOT EXISTS keys_fk_idx ON keys (
-    sections_id
-    );
+   CREATE INDEX IF NOT EXISTS keys_fk_idx ON keys (sections_id);
    ''';
   SectionsIndex1SQL = '''
-   CREATE INDEX IF NOT EXISTS sections_fk_idx ON sections (
-    parent_id
-    );
+   CREATE INDEX IF NOT EXISTS sections_fk_idx ON sections (parent_id);
    ''';
   SectionsIndex2SQL = '''
-   CREATE INDEX IF NOT EXISTS sections_name_idx ON sections (
-    section_name ASC
-    );
+    CREATE UNIQUE INDEX IF NOT EXISTS sections_name_parent_idx ON sections (
+    ifnull(parent_id, -1),
+    section_name COLLATE NOCASE );
    ''';
   WriteKeyValueSQL = '''
       insert into keys(key_name, sections_id, key_value)
@@ -228,18 +241,16 @@ begin
   Result := IncludeTrailingPathDelimiter(FileDir) + FileName;
 end;
 
-function TmsaSQLiteUserDatabase.SectionExists(const SectionName: string): Integer;
+function TmsaSQLiteUserDatabase.SectionExists(const ParentID: Integer; const SectionName: string): Integer;
 begin
-  FQuery.SQL.Text := 'SELECT id FROM sections WHERE upper(section_name) = :section_name';
-  FQuery.ParamByName('section_name').AsString := UpperCase(SectionName);
+  FQuery.SQL.Text := '''
+   SELECT id FROM sections WHERE trim(upper(section_name)) = :section_name and ifnull(parent_id, -1) = :parent_id
+  ''';
+  FQuery.ParamByName('section_name').AsString := Trim(UpperCase(SectionName));
+  FQuery.ParamByName('parent_id').AsInteger := ParentID;
   FQuery.Open;
   Result := if FQuery.FieldByName('id').IsNull then -1 else FQuery.FieldByName('id').AsInteger;
   FQuery.Close;
-end;
-
-function TmsaSQLiteUserDatabase.SectionId(const SectionName: string): Integer;
-begin
-  Result := SectionExists(SectionName);
 end;
 
 constructor TmsaSQLiteUserDatabase.Create(const ADatabaseFileName: string);
@@ -271,15 +282,22 @@ begin
   CreateMetadata;
 end;
 
-function TmsaSQLiteUserDatabase.CreateSection(const SectionName, Description: string): Integer;
+function TmsaSQLiteUserDatabase.CreateSection(const ParentID: Integer; const SectionName, Description: string): Integer;
 begin
-  Result := SectionExists(SectionName);
+  Result := SectionExists(ParentID, SectionName);
   if Result > -1 then
     Exit;
 
-  FQuery.SQL.Text := 'INSERT INTO sections(section_name, description) VALUES(:section_name, :description)';
+  FQuery.SQL.Text := 'INSERT INTO sections(parent_id, section_name, description) VALUES(:parent_id, :section_name, :description)';
+
   FQuery.ParamByName('section_name').AsString := SectionName;
   FQuery.ParamByName('description').AsString := Description;
+
+  if ParentID = -1 then
+    FQuery.ParamByName('parent_id').Value := null
+  else
+    FQuery.ParamByName('parent_id').AsInteger := ParentID;
+
   FQuery.ExecSQL;
   Result := Last_Insert_Rowid();
   FQuery.Close;
@@ -287,6 +305,9 @@ end;
 
 function TmsaSQLiteUserDatabase.DeleteSection(const SectionID: Integer): Integer;
 begin
+  Result := 0;
+  if SectionID = -1 then
+    Exit;
   FQuery.SQL.Text := 'DELETE FROM sections WHERE id = :sections_id';
   FQuery.ParamByName('sections_id').AsInteger := SectionID;
   FQuery.ExecSQL;
@@ -369,6 +390,11 @@ begin
     FQuery.ExecSQL;
     FQuery.Close;
 
+    SQL := ViewSectionsTreeSQL;
+    FQuery.SQL.Text := SQL;
+    FQuery.ExecSQL;
+    FQuery.Close;
+
   except
     on E: Exception do
     begin
@@ -410,36 +436,94 @@ end;
 
 procedure TmsaSQLiteUserDatabase.ReadKeys(const SectionID: Integer; KeysList: TList<TKeys>);
 var
-  SQL: string;
+  SQL, WhereSQL: string;
+const
+  ReadKeysSQL0 = '''
+ WITH RECURSIVE subsections AS (
+     SELECT
+       s.id,
+       s.parent_id,
+       s.section_name,
+       s.description,
+       s.hidden,
+       s.created_at,
+       s.modif_at,
+        CAST (s.section_name AS TEXT) AS path,
+       0 AS lvl
+     FROM sections s
+ ''';
+  ReadKeysSQL10 = '''
+   WHERE s.id = %d
+  ''';
+  ReadKeysSQL11 = '''
+    WHERE s.parent_id is null
+  ''';
+  ReadKeysSQL2 = '''
+     UNION ALL
+     SELECT
+       s.id,
+       s.parent_id,
+       s.section_name,
+       s.description,
+       s.hidden,
+       s.created_at,
+       s.modif_at,
+       ss.path || '\' || s.section_name,
+       ss.lvl + 1
+     FROM sections s
+          JOIN subsections ss ON s.parent_id = ss.id),
+ subsections_keys AS(
+SELECT
+  key_name,
+  sections_id,
+  case
+    when length(ifnull(description, '')) > 30 then substr(ifnull(description, ''), 1, 30) || '...'
+    else ifnull(description, '')
+  end description,
+  case
+    when length(ifnull(key_value, '')) > 30 then substr(ifnull(key_value, ''), 1, 30) || '...'
+    else ifnull(key_value, '')
+  end key_value,
+  case
+    when key_blob is not null then 'BLOB ' || length(key_blob) || ' bytes'
+    else 'NULL'
+  end key_blob,
+  key_blob_compressed,
+  created_at,
+  modif_at
+FROM keys)
+    SELECT
+       ssk.key_name
+      ,ssk.key_value
+      ,ssk.sections_id
+      ,ssk.description
+      ,ssk.key_blob
+      ,ssk.key_blob_compressed
+      ,ssk.created_at
+      ,ssk.modif_at
+      ,s.section_name
+      ,s.path section_path
+      ,s.hidden section_hidden
+      ,s.lvl section_level
+    FROM subsections s
+    inner join subsections_keys AS ssk on ssk.sections_id = s.id
+''';
+  ReadKeysSQL_Where = '''
+    WHERE 1 = 1
+   ''';
+  ReadKeysSQL_OrderBy = '''
+   order by s.lvl
+  ''';
 begin
   if KeysList = nil then
     Exit;
-  SQL := '''
-SELECT key_name, sections_id,
-case
- when length(ifnull(description, '')) > 30 then substr(ifnull(description, ''), 1, 30)||'...'
- else  ifnull(description, '')
-end description,
-case
- when length(ifnull(key_value, '')) > 30 then substr(ifnull(key_value, ''), 1, 30)||'...'
- else  ifnull(key_value, '')
-end key_value,
-case
- when key_blob is not null then 'BLOB ' || octet_length(key_blob) || ' bytes'
- else 'NULL'
-end key_blob,
-key_blob_compressed,
-created_at, modif_at FROM keys
-''';
-
-  if SectionID > 0 then
-  begin
-    FQuery.SQL.Text := SQL + ' WHERE sections_id = :sections_id';
-    FQuery.ParamByName('sections_id').AsInteger := SectionID;
-  end
+  if SectionID = -1 then
+    WhereSQL := ReadKeysSQL11
   else
-    FQuery.SQL.Text := SQL;
+    WhereSQL := format(ReadKeysSQL10, [SectionID]);
+  SQL := ReadKeysSQL0 + WhereSQL + ReadKeysSQL2 + ReadKeysSQL_Where + ReadKeysSQL_OrderBy;
 
+  FQuery.SQL.Text := SQL;
   FQuery.Open;
 
   var Enumerator := FQuery.Map<TKeys>(
@@ -465,12 +549,43 @@ created_at, modif_at FROM keys
   end;
 end;
 
-procedure TmsaSQLiteUserDatabase.ReadSections(SectionsList: TList<TSections>);
+procedure TmsaSQLiteUserDatabase.ReadSections(const SectionID: Integer; SectionsList: TList<TSections>);
 begin
   if SectionsList = nil then
     Exit;
+  if SectionID = -1 then
+    FQuery.SQL.Text := 'SELECT id, parent_id, section_name, description, hidden, created_at, modif_at FROM sections'
+  else
+  begin
+    FQuery.SQL.Text := '''
+    WITH RECURSIVE subtree AS (
+     SELECT s.id,
+          s.parent_id,
+          s.section_name,
+          s.description,
+          s.hidden,
+          s.created_at,
+          s.modif_at
+      FROM sections s
+      WHERE s.parent_id = :sections_id
 
-  FQuery.SQL.Text := 'SELECT id, parent_id, section_name, description, hidden, created_at, modif_at FROM sections';
+      UNION ALL
+
+     SELECT s.id,
+          s.parent_id,
+          s.section_name,
+          s.description,
+          s.hidden,
+          s.created_at,
+          s.modif_at
+      FROM sections s
+      JOIN
+          subtree st ON s.parent_id = st.id
+            )
+    SELECT s.id, s.parent_id, s.section_name, s.description, s.hidden, s.created_at, s.modif_at FROM subtree s
+    ''';
+    FQuery.ParamByName('sections_id').AsInteger := SectionID;
+  end;
   FQuery.Open;
 
   var Enumerator := FQuery.Map<TSections>(
@@ -555,7 +670,7 @@ end;
 
 procedure TmsaSQLiteUserDatabase.WriteValue(const SectionID: Integer; const KeyName: string; Value: string);
 begin
-  if SectionID < 1 then
+  if SectionID = -1 then
     Exit;
   FQuery.SQL.Text := WriteKeyValueSQL;
   SetQueryCommonParams(SectionID, KeyName);

@@ -20,79 +20,14 @@ object fMain: TfMain
     Height = 23
     TabOrder = 0
   end
-  object btnSectionExists: TButton
-    Left = 8
-    Top = 88
-    Width = 129
-    Height = 25
-    Caption = 'SectionExists'
-    TabOrder = 1
-    OnClick = btnSectionExistsClick
-  end
-  object btnCreateSection: TButton
-    Left = 8
-    Top = 119
-    Width = 129
-    Height = 25
-    Caption = 'CreateSection'
-    TabOrder = 2
-    OnClick = btnCreateSectionClick
-  end
   object btnKeysCount: TButton
-    Left = 8
-    Top = 150
+    Left = 9
+    Top = 90
     Width = 129
     Height = 25
     Caption = 'KeysCount'
-    TabOrder = 3
+    TabOrder = 1
     OnClick = btnKeysCountClick
-  end
-  object btnDeleteSection: TButton
-    Left = 8
-    Top = 181
-    Width = 129
-    Height = 25
-    Caption = 'DeleteSection'
-    Enabled = False
-    TabOrder = 4
-    OnClick = btnDeleteSectionClick
-  end
-  object ledSection: TLabeledEdit
-    Left = 8
-    Top = 56
-    Width = 121
-    Height = 23
-    EditLabel.Width = 39
-    EditLabel.Height = 15
-    EditLabel.Caption = 'Section'
-    TabOrder = 5
-    Text = 'Section Name'
-  end
-  object lbLog: TListBox
-    Left = 440
-    Top = 0
-    Width = 469
-    Height = 618
-    Align = alCustom
-    Anchors = [akLeft, akTop, akRight, akBottom]
-    Font.Charset = RUSSIAN_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -12
-    Font.Name = 'Segoe UI'
-    Font.Style = []
-    ItemHeight = 15
-    ParentFont = False
-    TabOrder = 6
-  end
-  object btnDeleteAll: TButton
-    Left = 8
-    Top = 212
-    Width = 129
-    Height = 25
-    Caption = 'DeleteAll'
-    Enabled = False
-    TabOrder = 7
-    OnClick = btnDeleteAllClick
   end
   object btnEraseSectionKeys: TButton
     Left = 8
@@ -100,8 +35,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'EraseSectionKeys'
-    Enabled = False
-    TabOrder = 8
+    TabOrder = 2
     OnClick = btnEraseSectionKeysClick
   end
   object btnReadKeys: TButton
@@ -110,17 +44,8 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'ReadKeys'
-    TabOrder = 9
+    TabOrder = 3
     OnClick = btnReadKeysClick
-  end
-  object btnReadSections: TButton
-    Left = 8
-    Top = 305
-    Width = 129
-    Height = 25
-    Caption = 'ReadSections'
-    TabOrder = 10
-    OnClick = btnReadSectionsClick
   end
   object btnValueExists: TButton
     Left = 167
@@ -128,7 +53,7 @@ object fMain: TfMain
     Width = 129
     Height = 25
     Caption = 'ValueExists'
-    TabOrder = 11
+    TabOrder = 4
     OnClick = btnValueExistsClick
   end
   object ledKey: TLabeledEdit
@@ -139,16 +64,16 @@ object fMain: TfMain
     EditLabel.Width = 19
     EditLabel.Height = 15
     EditLabel.Caption = 'Key'
-    TabOrder = 12
+    TabOrder = 5
     Text = 'Key174'
   end
   object btnVACUUM: TButton
-    Left = 176
-    Top = 64
+    Left = 144
+    Top = 72
     Width = 75
     Height = 25
     Caption = 'VACUUM'
-    TabOrder = 13
+    TabOrder = 6
     OnClick = btnVACUUMClick
   end
   object ledKeyValue: TLabeledEdit
@@ -159,7 +84,7 @@ object fMain: TfMain
     EditLabel.Width = 47
     EditLabel.Height = 15
     EditLabel.Caption = 'KeyValue'
-    TabOrder = 14
+    TabOrder = 7
     Text = ''
   end
   object ledDescription: TLabeledEdit
@@ -170,7 +95,7 @@ object fMain: TfMain
     EditLabel.Width = 60
     EditLabel.Height = 15
     EditLabel.Caption = 'Description'
-    TabOrder = 15
+    TabOrder = 8
     Text = ''
   end
   object btnWriteValue: TButton
@@ -179,7 +104,7 @@ object fMain: TfMain
     Width = 121
     Height = 25
     Caption = 'WriteValue'
-    TabOrder = 16
+    TabOrder = 9
     OnClick = btnWriteValueClick
   end
   object btnWriteStream: TButton
@@ -188,7 +113,7 @@ object fMain: TfMain
     Width = 121
     Height = 25
     Caption = 'WriteStream'
-    TabOrder = 17
+    TabOrder = 10
     OnClick = btnWriteStreamClick
   end
   object btnReadStream: TButton
@@ -197,7 +122,7 @@ object fMain: TfMain
     Width = 120
     Height = 25
     Caption = 'ReadStream'
-    TabOrder = 18
+    TabOrder = 11
     OnClick = btnReadStreamClick
   end
   object btnWriteDescription: TButton
@@ -206,7 +131,7 @@ object fMain: TfMain
     Width = 121
     Height = 25
     Caption = 'WriteDescription'
-    TabOrder = 19
+    TabOrder = 12
     OnClick = btnWriteDescriptionClick
   end
   object cbCompress: TCheckBox
@@ -215,7 +140,7 @@ object fMain: TfMain
     Width = 97
     Height = 17
     Caption = 'Compress'
-    TabOrder = 20
+    TabOrder = 13
   end
   object Button2: TButton
     Left = 176
@@ -223,7 +148,7 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'Button2'
-    TabOrder = 21
+    TabOrder = 14
     OnClick = Button2Click
   end
   object btnReadValue: TButton
@@ -232,16 +157,16 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'ReadValue'
-    TabOrder = 22
+    TabOrder = 15
     OnClick = btnReadValueClick
   end
   object ReadInteger: TButton
-    Left = 17
+    Left = 8
     Top = 526
     Width = 75
     Height = 25
     Caption = 'ReadInteger'
-    TabOrder = 23
+    TabOrder = 16
     OnClick = ReadIntegerClick
   end
   object btnReadFloat: TButton
@@ -250,7 +175,7 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'ReadFloat'
-    TabOrder = 24
+    TabOrder = 17
     OnClick = btnReadFloatClick
   end
   object btnReadDateTime: TButton
@@ -259,7 +184,7 @@ object fMain: TfMain
     Width = 87
     Height = 25
     Caption = 'ReadDateTime'
-    TabOrder = 25
+    TabOrder = 18
     OnClick = btnReadDateTimeClick
   end
   object Button1: TButton
@@ -268,7 +193,7 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'Set now'
-    TabOrder = 26
+    TabOrder = 19
     OnClick = Button1Click
   end
   object btnReadDate: TButton
@@ -277,7 +202,7 @@ object fMain: TfMain
     Width = 97
     Height = 25
     Caption = 'ReadDate'
-    TabOrder = 27
+    TabOrder = 20
     OnClick = btnReadDateClick
   end
   object btnReadTime: TButton
@@ -286,7 +211,7 @@ object fMain: TfMain
     Width = 97
     Height = 25
     Caption = 'ReadTime'
-    TabOrder = 28
+    TabOrder = 21
     OnClick = btnReadTimeClick
   end
   object btnReadBool: TButton
@@ -295,7 +220,7 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'ReadBool'
-    TabOrder = 29
+    TabOrder = 22
     OnClick = btnReadBoolClick
   end
   object btnDeleteKey: TButton
@@ -304,27 +229,152 @@ object fMain: TfMain
     Width = 75
     Height = 25
     Caption = 'DeleteKey'
-    TabOrder = 30
+    TabOrder = 23
     OnClick = btnDeleteKeyClick
   end
-  object btnCommit: TButton
-    Left = 328
-    Top = 520
-    Width = 75
-    Height = 25
-    Caption = 'Commit'
-    TabOrder = 31
+  object PageControl1: TPageControl
+    Left = 409
+    Top = 0
+    Width = 498
+    Height = 618
+    ActivePage = TabSheet1
+    Align = alRight
+    TabOrder = 24
+    object TabSheet1: TTabSheet
+      Caption = 'Tree'
+      object TreeView1: TTreeView
+        Left = 0
+        Top = 121
+        Width = 490
+        Height = 317
+        Align = alClient
+        Indent = 19
+        TabOrder = 0
+        OnDragDrop = TreeView1DragDrop
+        OnDragOver = TreeView1DragOver
+        OnStartDrag = TreeView1StartDrag
+        ExplicitHeight = 467
+      end
+      object Panel1: TPanel
+        Left = 0
+        Top = 0
+        Width = 490
+        Height = 97
+        Align = alTop
+        BevelEdges = []
+        BevelOuter = bvNone
+        TabOrder = 1
+        object btnRefresh: TButton
+          Left = 8
+          Top = 2
+          Width = 75
+          Height = 25
+          Caption = 'Refresh'
+          TabOrder = 0
+          OnClick = btnRefreshClick
+        end
+        object btnSectionExists: TButton
+          Left = 8
+          Top = 33
+          Width = 89
+          Height = 25
+          Caption = 'SectionExists'
+          TabOrder = 1
+          OnClick = btnSectionExistsClick
+        end
+        object btnCreateSection: TButton
+          Left = 8
+          Top = 64
+          Width = 89
+          Height = 25
+          Caption = 'CreateSection'
+          TabOrder = 2
+          OnClick = btnCreateSectionClick
+        end
+        object ledSection: TLabeledEdit
+          Left = 103
+          Top = 65
+          Width = 121
+          Height = 23
+          EditLabel.Width = 39
+          EditLabel.Height = 15
+          EditLabel.Caption = 'Section'
+          TabOrder = 3
+          Text = 'SectionName'
+        end
+        object btnDeleteSection: TButton
+          Left = 392
+          Top = 33
+          Width = 89
+          Height = 25
+          Caption = 'DeleteSection'
+          TabOrder = 4
+          OnClick = btnDeleteSectionClick
+        end
+        object btnDeleteAll: TButton
+          Left = 423
+          Top = 2
+          Width = 58
+          Height = 25
+          Caption = 'DeleteAll'
+          TabOrder = 5
+          OnClick = btnDeleteAllClick
+        end
+        object btnReadSections: TButton
+          Left = 143
+          Top = 2
+          Width = 89
+          Height = 25
+          Caption = 'ReadSections'
+          TabOrder = 6
+          OnClick = btnReadSectionsClick
+        end
+      end
+      object Panel2: TPanel
+        Left = 0
+        Top = 97
+        Width = 490
+        Height = 24
+        Align = alTop
+        BevelOuter = bvNone
+        TabOrder = 2
+      end
+      object lbLog: TListBox
+        Left = 0
+        Top = 438
+        Width = 490
+        Height = 150
+        Align = alBottom
+        Font.Charset = RUSSIAN_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = []
+        ItemHeight = 15
+        ParentFont = False
+        TabOrder = 3
+      end
+    end
+    object TabSheet2: TTabSheet
+      Caption = 'Log'
+      ImageIndex = 1
+    end
   end
-  object btnRollback: TButton
-    Left = 328
-    Top = 551
-    Width = 75
-    Height = 25
-    Caption = 'Rollback'
-    TabOrder = 32
-  end
-  object FDQuery1: TFDQuery
+  object Button3: TButton
     Left = 344
-    Top = 88
+    Top = 585
+    Width = 59
+    Height = 25
+    Caption = 'Clear'
+    TabOrder = 25
+    OnClick = Button3Click
+  end
+  object FDConnection: TFDConnection
+    Params.Strings = (
+      'Database=C:\Temp\options.db'
+      'DriverID=SQLite')
+    LoginPrompt = False
+    Left = 320
+    Top = 72
   end
 end
