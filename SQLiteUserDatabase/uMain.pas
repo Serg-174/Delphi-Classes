@@ -218,8 +218,28 @@ begin
 end;
 
 procedure TfMain.btnReadKeysClick(Sender: TObject);
-//var
-//  F: TInifile;
+  {
+
+  type
+  TKeys = record
+    key_name: string;
+    sections_id: Integer;
+    description: string;
+    key_value: string;
+    key_blob: string;
+    key_blob_compressed: Boolean;
+    created_at: TDateTime;
+    modif_at: TDateTime;
+    orderby: Real;
+
+    section_name: string;
+    section_path: string;
+    section_hidden: Boolean;
+    section_level: Integer;
+    section_orderby: Real;
+  end;
+
+  }
 begin
   var SectionId := FSectionsLoader.GetSelectedSectionID;
   var KeysList: TList<TKeys> := TList<TKeys>.Create;
@@ -231,9 +251,12 @@ begin
     begin
       var Key := KeysList[i];
 
-      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s | %s | %s', [i + 1, Key.key_name, Key.sections_id, Key.description,
+      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s | %s | %s | %s' ,
+        [i + 1, Key.key_name, Key.sections_id, Key.description,
         Key.key_value, Key.key_blob, BoolToStr(Key.key_blob_compressed, True), DateTimeToStr(Key.created_at),
-        DateTimeToStr(Key.modif_at)]));
+        DateTimeToStr(Key.modif_at), FloatToStr(Key.orderby)]));
+      lbLog.Items.Add(Format('%s | %s | %s | %d | %s' ,
+        [Key.section_name, Key.section_path,  BoolToStr(Key.section_hidden, True), Key.section_level, FloatToStr(Key.section_orderby)]));
     end;
 
   finally
@@ -252,9 +275,10 @@ begin
     for var i := 0 to SectionsList.Count - 1 do
     begin
       var Section := SectionsList[i];
-      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s | %s', [i + 1, Section.id, VariantToStrEx(Section.parent_id),
+      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s | %s | %s | %s | %d', [i + 1, Section.id, VariantToStrEx(Section.parent_id),
         Section.section_name, Section.description, BoolToStr(Section.hidden, True), DateTimeToStr(Section.created_at),
-        DateTimeToStr(Section.modif_at)]));
+        DateTimeToStr(Section.modif_at),
+        FloatToStr(Section.orderby), Section.path, Section.level]));
     end;
 
   finally
@@ -379,6 +403,7 @@ end;
 procedure TfMain.btnRefreshClick(Sender: TObject);
 begin
   FSectionsLoader.LoadSections;
+  TreeView1.AutoExpand := True;
 end;
 
 procedure TfMain.btnReadValueClick(Sender: TObject);

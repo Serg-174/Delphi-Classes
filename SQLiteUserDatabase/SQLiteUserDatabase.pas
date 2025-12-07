@@ -26,6 +26,12 @@ type
     key_blob_compressed: Boolean;
     created_at: TDateTime;
     modif_at: TDateTime;
+    orderby: Real;
+    section_name: string;
+    section_path: string;
+    section_hidden: Boolean;
+    section_level: Integer;
+    section_orderby: Real;
   end;
 
 type
@@ -37,6 +43,9 @@ type
     hidden: Boolean;
     created_at: TDateTime;
     modif_at: TDateTime;
+    orderby: Real;
+    path: string;
+    level: Integer;
   end;
 
 type
@@ -88,6 +97,8 @@ const
                           NOT NULL,
     parent_id    INTEGER  REFERENCES sections (id) ON DELETE CASCADE
                                                    ON UPDATE NO ACTION,
+    orderby      REAL     NOT NULL
+                          DEFAULT (0.0),
     section_name TEXT     NOT NULL,
     description  TEXT,
     hidden       INTEGER  NOT NULL
@@ -104,6 +115,8 @@ const
     sections_id         INTEGER  REFERENCES sections (id) ON DELETE CASCADE
                                                           ON UPDATE NO ACTION
                                  NOT NULL,
+    orderby      REAL     NOT NULL
+                          DEFAULT (0.0),
     description         TEXT,
     key_value           ANY,
     key_blob            BLOB,
@@ -170,6 +183,9 @@ const
   KeysIndex1SQL = '''
    CREATE INDEX IF NOT EXISTS keys_fk_idx ON keys (sections_id);
    ''';
+  KeysIndex2SQL = '''
+   CREATE INDEX IF NOT EXISTS keys_orderby_idx ON keys (orderby, key_name);
+   ''';
   SectionsIndex1SQL = '''
    CREATE INDEX IF NOT EXISTS sections_fk_idx ON sections (parent_id);
    ''';
@@ -177,6 +193,10 @@ const
     CREATE UNIQUE INDEX IF NOT EXISTS sections_name_parent_idx ON sections (
     ifnull(parent_id, -1),
     section_name COLLATE NOCASE );
+   ''';
+  SectionsIndex3SQL = '''
+    CREATE INDEX IF NOT EXISTS sections_orderby_idx ON sections (
+    orderby, section_name);
    ''';
   WriteKeyValueSQL = '''
       insert into keys(key_name, sections_id, key_value)
@@ -380,12 +400,22 @@ begin
     FQuery.ExecSQL;
     FQuery.Close;
 
+    SQL := KeysIndex2SQL;
+    FQuery.SQL.Text := SQL;
+    FQuery.ExecSQL;
+    FQuery.Close;
+
     SQL := SectionsIndex1SQL;
     FQuery.SQL.Text := SQL;
     FQuery.ExecSQL;
     FQuery.Close;
 
     SQL := SectionsIndex2SQL;
+    FQuery.SQL.Text := SQL;
+    FQuery.ExecSQL;
+    FQuery.Close;
+
+    SQL := SectionsIndex3SQL;
     FQuery.SQL.Text := SQL;
     FQuery.ExecSQL;
     FQuery.Close;
@@ -449,14 +479,15 @@ const
        s.created_at,
        s.modif_at,
         CAST (s.section_name AS TEXT) AS path,
-       0 AS lvl
+       0 AS lvl,
+       s.orderby
      FROM sections s
  ''';
   ReadKeysSQL10 = '''
    WHERE s.id = %d
   ''';
   ReadKeysSQL11 = '''
-    WHERE s.parent_id is null
+   WHERE s.parent_id is null
   ''';
   ReadKeysSQL2 = '''
      UNION ALL
@@ -469,7 +500,8 @@ const
        s.created_at,
        s.modif_at,
        ss.path || '\' || s.section_name,
-       ss.lvl + 1
+       ss.lvl + 1,
+       s.orderby
      FROM sections s
           JOIN subsections ss ON s.parent_id = ss.id),
  subsections_keys AS(
@@ -490,7 +522,8 @@ SELECT
   end key_blob,
   key_blob_compressed,
   created_at,
-  modif_at
+  modif_at,
+  orderby
 FROM keys)
     SELECT
        ssk.key_name
@@ -501,10 +534,12 @@ FROM keys)
       ,ssk.key_blob_compressed
       ,ssk.created_at
       ,ssk.modif_at
+      ,ssk.orderby
       ,s.section_name
       ,s.path section_path
       ,s.hidden section_hidden
       ,s.lvl section_level
+      ,s.orderby section_orderby
     FROM subsections s
     inner join subsections_keys AS ssk on ssk.sections_id = s.id
 ''';
@@ -512,7 +547,7 @@ FROM keys)
     WHERE 1 = 1
    ''';
   ReadKeysSQL_OrderBy = '''
-   order by s.lvl
+   order by s.lvl, s.orderby, s.section_name, ssk.orderby, ssk.key_name
   ''';
 begin
   if KeysList = nil then
@@ -526,6 +561,28 @@ begin
   FQuery.SQL.Text := SQL;
   FQuery.Open;
 
+  {
+
+  type
+  TKeys = record
+    key_name: string;
+    sections_id: Integer;
+    description: string;
+    key_value: string;
+    key_blob: string;
+    key_blob_compressed: Boolean;
+    created_at: TDateTime;
+    modif_at: TDateTime;
+    orderby: Real;
+    section_name: string;
+    section_path: string;
+    section_hidden: Boolean;
+    section_level: Integer;
+    section_orderby: Real;
+  end;
+
+  }
+
   var Enumerator := FQuery.Map<TKeys>(
     function(DataSet: TDataSet): TKeys
     begin
@@ -537,6 +594,12 @@ begin
       Result.key_blob_compressed := DataSet.FieldByName('key_blob_compressed').AsInteger = 1;
       Result.created_at := DataSet.FieldByName('created_at').AsDateTime;
       Result.modif_at := DataSet.FieldByName('modif_at').AsDateTime;
+      Result.orderby := DataSet.FieldByName('orderby').AsFloat;
+      Result.section_name := DataSet.FieldByName('section_name').AsString;
+      Result.section_path := DataSet.FieldByName('section_path').AsString;
+      Result.section_hidden := DataSet.FieldByName('section_hidden').AsInteger = 1;
+      Result.section_level := DataSet.FieldByName('section_level').AsInteger;
+      Result.section_orderby := DataSet.FieldByName('section_orderby').AsFloat;
     end);
   try
     while Enumerator.MoveNext do
@@ -550,42 +613,74 @@ begin
 end;
 
 procedure TmsaSQLiteUserDatabase.ReadSections(const SectionID: Integer; SectionsList: TList<TSections>);
+var
+  SQL, WhereSQL: string;
+const
+  ReadSectionsSQL0 = '''
+  WITH RECURSIVE subsections AS (
+     SELECT
+       s.id,
+       s.parent_id,
+       s.section_name,
+       s.description,
+       s.hidden,
+       s.created_at,
+       s.modif_at,
+        CAST (s.section_name AS TEXT) AS path,
+       0 AS level,
+       s.orderby
+     FROM sections s
+ ''';
+  ReadSectionsSQL10 = '''
+   WHERE s.parent_id = %d
+  ''';
+  ReadSectionsSQL11 = '''
+   WHERE s.parent_id is null
+  ''';
+  ReadSectionsSQL2 = '''
+ UNION ALL
+     SELECT
+       s.id,
+       s.parent_id,
+       s.section_name,
+       s.description,
+       s.hidden,
+       s.created_at,
+       s.modif_at,
+       ss.path || '\' || s.section_name,
+       ss.level + 1 level,
+       s.orderby
+     FROM sections s
+          JOIN subsections ss ON s.parent_id = ss.id)
+    SELECT
+       s.id
+      ,s.parent_id
+      ,s.section_name
+      ,s.description
+      ,s.hidden
+      ,s.orderby
+      ,s.created_at
+      ,s.modif_at
+      ,s.path
+      ,s.level
+    FROM subsections s
+''';
+  ReadSectionsSQL_Where = '''
+    WHERE 1 = 1
+   ''';
+  ReadSectionsSQL_OrderBy = '''
+   order by s.level, s.orderby, s.section_name
+  ''';
 begin
   if SectionsList = nil then
     Exit;
+
   if SectionID = -1 then
-    FQuery.SQL.Text := 'SELECT id, parent_id, section_name, description, hidden, created_at, modif_at FROM sections'
+    WhereSQL := ReadSectionsSQL11
   else
-  begin
-    FQuery.SQL.Text := '''
-    WITH RECURSIVE subtree AS (
-     SELECT s.id,
-          s.parent_id,
-          s.section_name,
-          s.description,
-          s.hidden,
-          s.created_at,
-          s.modif_at
-      FROM sections s
-      WHERE s.parent_id = :sections_id
-
-      UNION ALL
-
-     SELECT s.id,
-          s.parent_id,
-          s.section_name,
-          s.description,
-          s.hidden,
-          s.created_at,
-          s.modif_at
-      FROM sections s
-      JOIN
-          subtree st ON s.parent_id = st.id
-            )
-    SELECT s.id, s.parent_id, s.section_name, s.description, s.hidden, s.created_at, s.modif_at FROM subtree s
-    ''';
-    FQuery.ParamByName('sections_id').AsInteger := SectionID;
-  end;
+    WhereSQL := format(ReadSectionsSQL10, [SectionID]);
+  SQL := ReadSectionsSQL0 + WhereSQL + ReadSectionsSQL2 + ReadSectionsSQL_Where + ReadSectionsSQL_OrderBy;
+  FQuery.SQL.Text := SQL;
   FQuery.Open;
 
   var Enumerator := FQuery.Map<TSections>(
@@ -596,8 +691,11 @@ begin
       Result.section_name := DataSet.FieldByName('section_name').AsString;
       Result.description := DataSet.FieldByName('description').AsString;
       Result.hidden := (DataSet.FieldByName('hidden').AsInteger = 1);
+      Result.orderby := DataSet.FieldByName('orderby').AsFloat;
       Result.created_at := DataSet.FieldByName('created_at').AsDateTime;
       Result.modif_at := DataSet.FieldByName('modif_at').AsDateTime;
+      Result.path := DataSet.FieldByName('path').AsString;
+      Result.level := DataSet.FieldByName('level').AsInteger;
     end);
   try
     while Enumerator.MoveNext do

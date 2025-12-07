@@ -3,7 +3,7 @@ object fMain: TfMain
   Top = 0
   Caption = 'TmsaSQLiteINI test'
   ClientHeight = 618
-  ClientWidth = 907
+  ClientWidth = 1312
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -233,9 +233,9 @@ object fMain: TfMain
     OnClick = btnDeleteKeyClick
   end
   object PageControl1: TPageControl
-    Left = 409
+    Left = 432
     Top = 0
-    Width = 498
+    Width = 880
     Height = 618
     ActivePage = TabSheet1
     Align = alRight
@@ -245,7 +245,7 @@ object fMain: TfMain
       object TreeView1: TTreeView
         Left = 0
         Top = 121
-        Width = 490
+        Width = 872
         Height = 317
         Align = alClient
         Indent = 19
@@ -253,17 +253,18 @@ object fMain: TfMain
         OnDragDrop = TreeView1DragDrop
         OnDragOver = TreeView1DragOver
         OnStartDrag = TreeView1StartDrag
-        ExplicitHeight = 467
+        ExplicitWidth = 490
       end
       object Panel1: TPanel
         Left = 0
         Top = 0
-        Width = 490
+        Width = 872
         Height = 97
         Align = alTop
         BevelEdges = []
         BevelOuter = bvNone
         TabOrder = 1
+        ExplicitWidth = 490
         object btnRefresh: TButton
           Left = 8
           Top = 2
@@ -333,16 +334,17 @@ object fMain: TfMain
       object Panel2: TPanel
         Left = 0
         Top = 97
-        Width = 490
+        Width = 872
         Height = 24
         Align = alTop
         BevelOuter = bvNone
         TabOrder = 2
+        ExplicitWidth = 490
       end
       object lbLog: TListBox
         Left = 0
         Top = 438
-        Width = 490
+        Width = 872
         Height = 150
         Align = alBottom
         Font.Charset = RUSSIAN_CHARSET
@@ -353,6 +355,7 @@ object fMain: TfMain
         ItemHeight = 15
         ParentFont = False
         TabOrder = 3
+        ExplicitWidth = 490
       end
     end
     object TabSheet2: TTabSheet
