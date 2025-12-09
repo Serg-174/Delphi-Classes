@@ -8,7 +8,8 @@ uses
   System.StrUtils, Vcl.Mask, FireDAC.Stan.Def, FireDAC.VCLUI.Wait, FireDAC.VCLUI.Controls, FireDAC.Stan.Intf,
   FireDAC.Phys, FireDAC.Phys.SQLite, Vcl.ComCtrls, FireDAC.Stan.Option, FireDAC.Stan.Error, FireDAC.UI.Intf,
   FireDAC.Phys.Intf, FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys.SQLiteDef, FireDAC.Stan.ExprFuncs,
-  FireDAC.Phys.SQLiteWrapper.Stat, Data.DB, FireDAC.Comp.Client, uTreeLoader, FireDAC.Stan.Param;
+  FireDAC.Phys.SQLiteWrapper.Stat, Data.DB, FireDAC.Comp.Client, uTreeLoader, FireDAC.Stan.Param, FireDAC.DatS,
+  FireDAC.DApt.Intf, FireDAC.DApt, FireDAC.Comp.DataSet;
 
 type
   TfMain = class(TForm)
@@ -52,6 +53,39 @@ type
     btnReadSections: TButton;
     lbLog: TListBox;
     Button3: TButton;
+    FDQuery1: TFDQuery;
+    FDStoredProc1: TFDStoredProc;
+    Label1: TLabel;
+    Label2: TLabel;
+    Button5: TButton;
+    Label3: TLabel;
+    Label4: TLabel;
+    Button4: TButton;
+    btnGetSectionFullPath: TButton;
+    Edit1: TEdit;
+    Edit2: TEdit;
+    Edit3: TEdit;
+    btnReadKey: TButton;
+    Edit4: TEdit;
+    Edit5: TEdit;
+    CheckBox1: TCheckBox;
+    btnReadSection: TButton;
+    Edit6: TEdit;
+    Edit7: TEdit;
+    btnRenameSection: TButton;
+    Edit8: TEdit;
+    btnWriteSectionDescription: TButton;
+    btnCountOfWords: TButton;
+    Label5: TLabel;
+    CheckBox2: TCheckBox;
+    btnGetWordNum: TButton;
+    Edit9: TEdit;
+    btnMakeRoot: TButton;
+    Edit10: TEdit;
+    btnForceSections: TButton;
+    Edit11: TEdit;
+    btnChangeSectionSortOrder: TButton;
+    btnChangeKeySortOrder: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnSectionExistsClick(Sender: TObject);
     procedure btnCreateSectionClick(Sender: TObject);
@@ -83,13 +117,26 @@ type
     procedure TreeView1DragDrop(Sender, Source: TObject; X, Y: Integer);
     procedure TreeView1DragOver(Sender, Source: TObject; X, Y: Integer; State: TDragState; var Accept: Boolean);
     procedure Button3Click(Sender: TObject);
+    procedure Button5Click(Sender: TObject);
+    procedure Button4Click(Sender: TObject);
+    procedure btnGetSectionFullPathClick(Sender: TObject);
+    procedure btnReadKeyClick(Sender: TObject);
+    procedure btnReadSectionClick(Sender: TObject);
+    procedure btnRenameSectionClick(Sender: TObject);
+    procedure btnWriteSectionDescriptionClick(Sender: TObject);
+    procedure btnCountOfWordsClick(Sender: TObject);
+    procedure btnGetWordNumClick(Sender: TObject);
+    procedure btnMakeRootClick(Sender: TObject);
+    procedure btnForceSectionsClick(Sender: TObject);
+    procedure btnChangeSectionSortOrderClick(Sender: TObject);
+    procedure btnChangeKeySortOrderClick(Sender: TObject);
 
   private
     { Private declarations }
     FMyOptions: TmsaSQLiteUserDatabase;
     FSectionsLoader: TTreeViewSectionsLoader;
     FDraggedSectionID: Integer;
-    procedure UpdateSectionParent(SectionID, NewParentID: Integer);
+    procedure UpdateSectionParent(SectionID: Integer; NewParentID: Variant);
   public
     { Public declarations }
   end;
@@ -110,7 +157,7 @@ implementation
 {$R *.dfm}
 
 uses
-  uCommon;
+  uCommon, msaClassHelpers;
 
 function ExtractSQLiteDll: Boolean;
 
@@ -162,12 +209,22 @@ begin
   Panel2.Caption := S + ' ' + ledSection.Text;
 end;
 
+procedure TfMain.btnCountOfWordsClick(Sender: TObject);
+begin
+  Label5.Caption := CountOfWords(edDBName.Text, ' ', CheckBox2.Checked).ToString;
+end;
+
+procedure TfMain.btnGetWordNumClick(Sender: TObject);
+begin
+  Label5.Caption := GetWordNum(edDBName.Text, ' ', StrToInt(Edit9.Text), CheckBox2.Checked);
+end;
+
 procedure TfMain.btnCreateSectionClick(Sender: TObject);
 var
   Parent: Integer;
 begin
   Parent := FSectionsLoader.GetSelectedSectionID;
-  lbLog.Items.Add(format('CreateRootSection: id = %d', [FMyOptions.CreateSection(Parent, ledSection.Text, 'Описание(пример)')]));
+  lbLog.Items.Add(format('CreateSection: id = %d', [FMyOptions.CreateSection(Parent, ledSection.Text, 'Описание(пример)')]));
   FSectionsLoader.LoadSections;
   TreeView1.AutoExpand := True;
 end;
@@ -190,12 +247,25 @@ begin
   lbLog.Items.Add(format('KeysCount: cnt = %d', [FMyOptions.KeysCount(Section_id)]));
 end;
 
-procedure TfMain.btnEraseSectionKeysClick(Sender: TObject);
-var
-  SectionId: integer;
+procedure TfMain.btnMakeRootClick(Sender: TObject);
 begin
-  SectionId := FSectionsLoader.GetSelectedSectionID;
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  FMyOptions.ChangeSectionParent(SectionId, null);
+  FSectionsLoader.LoadSections;
+  TreeView1.AutoExpand := True;
+end;
+
+procedure TfMain.btnEraseSectionKeysClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
   lbLog.Items.Add(format('EraseSection: cnt = %d', [FMyOptions.EraseSectionKeys(SectionId)]));
+end;
+
+procedure TfMain.btnForceSectionsClick(Sender: TObject);
+begin
+  FMyOptions.ForceSections(Trim(Edit10.Text));
+  FSectionsLoader.LoadSections;
+  TreeView1.AutoExpand := True;
 end;
 
 procedure TfMain.FormCreate(Sender: TObject);
@@ -215,6 +285,33 @@ procedure TfMain.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(FMyOptions);
   FreeAndNil(FSectionsLoader);
+end;
+
+procedure TfMain.btnReadKeyClick(Sender: TObject);
+begin
+  var K: TKeys;
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  K := FMyOptions.ReadKey(SectionId, ledKey.Text);
+  Edit2.Text := K.key_name;
+  Edit3.Text := K.key_value;
+  Edit4.Text := K.description;
+  Edit5.Text := DateTimeToStr(K.modif_at);
+  CheckBox1.Checked := K.key_blob_compressed;
+end;
+
+procedure TfMain.btnReadSectionClick(Sender: TObject);
+begin
+  var K: TSections;
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  K := FMyOptions.ReadSection(SectionId);
+
+  Edit2.Text := K.id.ToString;
+  Edit7.Text := K.section_name;
+  Edit3.Text := VariantToStrEx(K.parent_id);
+  Edit4.Text := K.description;
+  Edit5.Text := DateTimeToStr(K.modif_at);
+  Edit6.Text := K.keys_count.ToString;
+  CheckBox1.Checked := K.hidden;
 end;
 
 procedure TfMain.btnReadKeysClick(Sender: TObject);
@@ -251,12 +348,11 @@ begin
     begin
       var Key := KeysList[i];
 
-      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s | %s | %s | %s' ,
-        [i + 1, Key.key_name, Key.sections_id, Key.description,
-        Key.key_value, Key.key_blob, BoolToStr(Key.key_blob_compressed, True), DateTimeToStr(Key.created_at),
+      lbLog.Items.Add(Format('%d) %s | %d | %s | %s | %s | %s | %s | %s | %s', [i + 1, Key.key_name, Key.sections_id,
+        Key.description, Key.key_value, Key.key_blob, BoolToStr(Key.key_blob_compressed, True), DateTimeToStr(Key.created_at),
         DateTimeToStr(Key.modif_at), FloatToStr(Key.orderby)]));
-      lbLog.Items.Add(Format('%s | %s | %s | %d | %s' ,
-        [Key.section_name, Key.section_path,  BoolToStr(Key.section_hidden, True), Key.section_level, FloatToStr(Key.section_orderby)]));
+      lbLog.Items.Add(Format('%s | %s | %s | %d | %s', [Key.section_name, Key.section_path, BoolToStr(Key.section_hidden,
+        True), Key.section_level, FloatToStr(Key.section_orderby)]));
     end;
 
   finally
@@ -275,10 +371,10 @@ begin
     for var i := 0 to SectionsList.Count - 1 do
     begin
       var Section := SectionsList[i];
-      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s | %s | %s | %s | %d', [i + 1, Section.id, VariantToStrEx(Section.parent_id),
-        Section.section_name, Section.description, BoolToStr(Section.hidden, True), DateTimeToStr(Section.created_at),
-        DateTimeToStr(Section.modif_at),
-        FloatToStr(Section.orderby), Section.path, Section.level]));
+      lbLog.Items.Add(Format('%d) %d | %s | %s | %s | %s | %s | %s | %s | %s |Lvl: %d |Keys: %d', [i + 1, Section.id,
+        VariantToStrEx(Section.parent_id), Section.section_name, Section.description, BoolToStr(Section.hidden, True),
+        DateTimeToStr(Section.created_at), DateTimeToStr(Section.modif_at), FloatToStr(Section.orderby), Section.path,
+        Section.level, Section.keys_count]));
     end;
 
   finally
@@ -400,10 +496,54 @@ begin
   lbLog.Clear;
 end;
 
+procedure TfMain.Button4Click(Sender: TObject);
+var
+  KeyCreatedModified: TCreatedModified;
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  KeyCreatedModified := FMyOptions.GetKeyCreatedModified(SectionId, ledKey.Text);
+  Label3.Caption := KeyCreatedModified.Created_at;
+  Label4.Caption := KeyCreatedModified.Modif_at;
+end;
+
+procedure TfMain.Button5Click(Sender: TObject);
+var
+  SectionCreatedModified: TCreatedModified;
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  SectionCreatedModified := FMyOptions.GetSectionCreatedModified(SectionId);
+  Label1.Caption := SectionCreatedModified.Created_at;
+  Label2.Caption := SectionCreatedModified.Modif_at;
+end;
+
+procedure TfMain.btnGetSectionFullPathClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  Edit1.Text := FMyOptions.GetSectionFullPath(SectionId);
+end;
+
 procedure TfMain.btnRefreshClick(Sender: TObject);
 begin
   FSectionsLoader.LoadSections;
   TreeView1.AutoExpand := True;
+end;
+
+procedure TfMain.btnRenameSectionClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  FMyOptions.RenameSection(SectionId, ledSection.Text);
+  lbLog.Items.Add('RenameSection:');
+  lbLog.Items.Add(Format('%d | %s', [SectionId, ledSection.Text]));
+  FSectionsLoader.LoadSections;
+  TreeView1.AutoExpand := True;
+end;
+
+procedure TfMain.btnWriteSectionDescriptionClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  FMyOptions.WriteSectionDescription(SectionId, Edit8.Text);
+  lbLog.Items.Add('WriteSectionDescription:');
+  lbLog.Items.Add(Format('%d | %s', [SectionId, Edit8.Text]));
 end;
 
 procedure TfMain.btnReadValueClick(Sender: TObject);
@@ -458,20 +598,9 @@ begin
   end;
 end;
 
-procedure TfMain.UpdateSectionParent(SectionID, NewParentID: Integer);
-var
-  Query: TFDQuery;
+procedure TfMain.UpdateSectionParent(SectionID: Integer; NewParentID: Variant);
 begin
-  Query := TFDQuery.Create(nil);
-  try
-    Query.Connection := FDConnection;
-    Query.SQL.Text := 'UPDATE sections SET parent_id = :ParentID WHERE id = :ID';
-    Query.ParamByName('ParentID').AsInteger := NewParentID;
-    Query.ParamByName('ID').AsInteger := SectionID;
-    Query.ExecSQL;
-  finally
-    Query.Free;
-  end;
+  FMyOptions.ChangeSectionParent(SectionID, NewParentID);
 end;
 
 procedure TfMain.TreeView1StartDrag(Sender: TObject; var DragObject: TDragObject);
@@ -534,6 +663,18 @@ procedure TfMain.btnDeleteKeyClick(Sender: TObject);
 begin
   var SectionId := FSectionsLoader.GetSelectedSectionID;
   lbLog.Items.Add(format('DeleteKey: cnt = %d', [FMyOptions.DeleteKey(SectionId, ledKey.Text)]));
+end;
+
+procedure TfMain.btnChangeKeySortOrderClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  FMyOptions.ChangeKeySortOrder(SectionId, ledKey.Text, StrToFloatDef(Edit11.Text, 0));
+end;
+
+procedure TfMain.btnChangeSectionSortOrderClick(Sender: TObject);
+begin
+  var SectionId := FSectionsLoader.GetSelectedSectionID;
+  FMyOptions.ChangeSectionSortOrder(SectionId, StrToFloatDef(Edit11.Text, 0));
 end;
 
 initialization

@@ -6,7 +6,8 @@ uses
   SQLiteUserDatabase in 'SQLiteUserDatabase.pas',
   DataSetEnumerator in '..\DataSetEnumerator\DataSetEnumerator.pas',
   uCommon in '..\Common\uCommon.pas',
-  uTreeLoader in 'uTreeLoader.pas';
+  uTreeLoader in 'uTreeLoader.pas',
+  msaClassHelpers in '..\Common\msaClassHelpers.pas';
 
 {$R *.res}
 
